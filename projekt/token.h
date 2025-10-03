@@ -19,35 +19,62 @@ typedef enum {
     T_NONE,
 
     T_IDENTIFIER,
+    T_GLOB_IDENTIFIER,
     T_EOF,
     T_EOL,
 
-    T_NUMBER,
+    // keywords
+    T_CLASS,
+    T_IF,
+    T_ELSE,
+    T_IS,
+    T_NULL,
+    T_RETURN,
+    T_VAR,
+    T_WHILE,
+    T_STATIC,
+    T_IMPORT,
+    T_FOR,
+    T_NUM,
     T_STRING,
-    T_KEYWORD,
-    T_OPERATOR,
-    T_COMMA,
-    T_SEMICOLON,
-    T_LPAREN,
-    T_RPAREN,
-    T_LBRACE,
-    T_RBRACE,
-    T_ASSIGN,
-    T_PLUS,
-    T_MINUS,
-    T_MUL,
-    T_DIV,
-    T_CONCAT,
-    T_EQ,
-    T_NEQ,
-    T_LT,
-    T_GT,
-    T_LTEQ,
-    T_GTEQ,
-    T_AND,
-    T_OR,
-    T_NOT
-} token_type;
+    T_NULLTYPE,
+    T_IFJ,
+    T_IN,
+    T_BREAK,
+    T_CONTINUE,
+
+    // literars
+    T_INT,
+    T_HEXINT,
+    T_FLOAT,
+    T_STRING,
+    T_TRUE,
+    T_FALSE,
+
+    // operators
+    T_PLUS,     // +
+    T_MINUS,    // -
+    T_MUL,      // *
+    T_DIV,      // /
+    T_LT,       // <
+    T_LE,       // <=
+    T_GT,       // >
+    T_GE,       // >=
+    T_EQ,       // ==
+    T_NEQ,      // !=
+    T_AND,      // &&
+    T_OR,       // ||
+    T_NOT,      // !
+    T_ASSIGN,   // =
+    T_LPAREN,   // (
+    T_RPAREN,   // )
+    T_LBRACE,   // {
+    T_RBRACE,   // }
+    T_COMMA,    // ,
+    T_DOT,      // .
+    T_COLON,    // :
+    T_QUESTION  // ?
+    } token_type;
 
 
 /// @brief structure for the token

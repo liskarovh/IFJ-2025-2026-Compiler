@@ -34,7 +34,7 @@ void token_format_string(tokenPtr t) {
     printf("Token type: %d\n", t->type);
     printf("Token value: %s\n", t->value->data);
     printf("Token value_float: %f\n", t->value_float);
-    printf("Token value_int: %d\n", t->value_int);
+    printf("Token value_int: %lld\n", t->value_int);
     printf("\n");
 }
 
@@ -44,7 +44,10 @@ void token_clear(tokenPtr t) {
     t->type = T_NONE;
     t->value_float = 0;
     t->value_int = 0;
-    string_clear(t->value);
+    if (t->value) {
+        string_destroy(t->value);
+        t->value = NULL;
+    }
 }
 
 /// @brief frees the memory allocated for the token

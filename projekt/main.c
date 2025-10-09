@@ -1,5 +1,6 @@
 /**
  * @authors Martin Bíško (xbiskom00)
+ * @authors Hana Liškařová (xliskah00)
  *
  * @file main.c;
  * 
@@ -8,6 +9,8 @@
  */
 
 #include <stdio.h>
+#include "scanner.h"
+
 
 int main() {
     printf("Hello, World!\n");

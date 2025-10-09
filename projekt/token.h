@@ -18,38 +18,39 @@
 typedef enum {
     T_NONE,
 
-    T_IDENTIFIER,
-    T_GLOB_IDENTIFIER,
+    T_IDENT,
+    T_GLOB_IDENT,
     T_EOF,
     T_EOL,
 
     // keywords
-    T_CLASS,
-    T_IF,
-    T_ELSE,
-    T_IS,
-    T_NULL,
-    T_RETURN,
-    T_VAR,
-    T_WHILE,
-    T_STATIC,
-    T_IMPORT,
-    T_FOR,
-    T_NUM,
-    T_STRING,
-    T_NULLTYPE,
-    T_IFJ,
-    T_IN,
-    T_BREAK,
-    T_CONTINUE,
+    T_KW_CLASS,
+    T_KW_IF,
+    T_KW_ELSE,
+    T_KW_IS,
+    T_KW_NULL,
+    T_KW_RETURN,
+    T_KW_VAR,
+    T_KW_WHILE,
+    T_KW_STATIC,
+    T_KW_IMPORT,
+    T_KW_FOR,
+    T_KW_NUM,
+    T_KW_NULLTYPE,
+    T_KW_IFJ,
+    T_KW_IN,
+    T_KW_BREAK,
+    T_KW_CONTINUE,
+    T_KW_STRING,
 
     // literars
     T_INT,
     T_HEXINT,
     T_FLOAT,
     T_STRING,
-    T_TRUE,
-    T_FALSE,
+    T_ML_STRING,
+    T_BOOL_TRUE,
+    T_BOOL_FALSE,
 
     // operators
     T_PLUS,     // +
@@ -72,6 +73,8 @@ typedef enum {
     T_RBRACE,   // }
     T_COMMA,    // ,
     T_DOT,      // .
+    T_RANGE_INC, // ..
+    T_RANGE_EXC, // ...
     T_COLON,    // :
     T_QUESTION  // ?
     } token_type;
@@ -81,8 +84,8 @@ typedef enum {
 typedef struct token {
     token_type type;
     string value;
-    float value_float;
-    int value_int;
+    double value_float;
+    long long value_int;
     int depth;
 } *tokenPtr;
 

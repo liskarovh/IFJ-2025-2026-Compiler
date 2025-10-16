@@ -63,7 +63,11 @@ void string_clear(string str)
 /// @param str string to be freed
 void string_destroy(string str)
 {
-    free(str->data);
+    if (!str) return;
+    if (str->data) {
+        free(str->data);
+        str->data = NULL;
+    }
     free(str);
 }
 

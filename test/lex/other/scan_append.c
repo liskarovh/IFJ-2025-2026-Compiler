@@ -1,15 +1,16 @@
 /**
  * @authors Hana Liškařová (xliskah00)
- * @file scan_driver.c
+ * @file scan_append.c
  *
- * Run full lexical analysis via scanner(), print the token list.
+ * Tokenize by repeated calls to scanner_append_next_token(),
+ * then print the token list.
  * BUT FIT
  */
 #include <stdio.h>
 #include <stdlib.h>
-#include "../projekt/scanner.h"
-#include "../projekt/token.h"
-#include "../projekt/error.h"
+#include "../../../projekt/scanner.h"
+#include "../../../projekt/token.h"
+#include "../../../projekt/error.h"
 
 static const char *tt(int t) {
     switch (t) {
@@ -50,21 +51,32 @@ int main(int argc, char **argv) {
     }
 
     DLListTokens list;
-    int status = scanner(src, &list);
-    if (argc == 2) fclose(src);
+    DLLTokens_Init(&list);
+    scanner_init(src);
 
-    if (status != SUCCESS) {
-        fprintf(stderr, "scanner() failed with %d at L%d C%d\n",
-                status, scanner_get_line(), scanner_get_col());
-        return 1;
+    for (;;) {
+        int status = scanner_append_next_token(&list);
+        if (status != SUCCESS) {
+            fprintf(stderr, "append_next failed with %d at L%d C%d\n",
+                    status, scanner_get_line(), scanner_get_col());
+            scanner_destroy();
+            if (argc == 2) fclose(src);
+            DLLTokens_Dispose(&list);
+            return 1;
+        }
+        if (list.last && list.last->token &&
+            list.last->token->type == T_EOF) {
+            break;
+        }
     }
 
-    /* print tokens */
-    printf("== TOKENS (scanner) len=%d ==\n", list.length);
+    scanner_destroy();
+    if (argc == 2) fclose(src);
+
+    printf("== TOKENS (append_next) len=%d ==\n", list.length);
     for (DLLTokenElementPtr it = list.first; it; it = it->next) {
         printf("%s\n", tt(it->token->type));
     }
-
     DLLTokens_Dispose(&list);
     return 0;
 }

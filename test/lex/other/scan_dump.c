@@ -1,9 +1,9 @@
 // test/scan_dump.c
 #include <stdio.h>
-#include "../projekt/scanner.h"
-#include "../projekt/token.h"
-#include "../projekt/string.h"
-#include "../projekt/error.h"
+#include "../../../projekt/scanner.h"
+#include "../../../projekt/token.h"
+#include "../../../projekt/string.h"
+#include "../../../projekt/error.h"
 
 // --- add to ../test/scan_dump.c, before main() ---
 static const char* tt(int t) {

@@ -41,43 +41,26 @@ run: $(BUILD_DIR)/$(PROJECT_NAME)
 # =================================================================
 #                       TEST
 # =================================================================
-TEST_DIR := ../test
+TEST_DIR := ../test/lex/other
 
-# Objecty testů
-$(OBJ_DIR)/scan_driver.o: $(TEST_DIR)/scan_driver.c scanner.h token.h
-	$(CC) $(CFLAGS) -c $(TEST_DIR)/scan_driver.c -o $@
 
-$(OBJ_DIR)/scan_append.o: $(TEST_DIR)/scan_append.c scanner.h token.h
-	$(CC) $(CFLAGS) -c $(TEST_DIR)/scan_append.c -o $@
 
-# Link
-$(BUILD_DIR)/scan_driver: $(OBJ_DIR)/scanner.o $(OBJ_DIR)/token.o $(OBJ_DIR)/string.o $(OBJ_DIR)/error.o $(OBJ_DIR)/scan_driver.o
+# ---- scan_dump (plný výpis) -----------------------------------
+
+# Překlad – explicitní cesta do ../test/lex/other
+$(OBJ_DIR)/scan_dump.o: ../test/lex/other/scan_dump.c scanner.h token.h error.h | $(OBJ_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Link – proti scanner.o, token.o, string.o, error.o
+$(BUILD_DIR)/scan_dump: $(OBJ_DIR)/scan_dump.o $(OBJ_DIR)/scanner.o $(OBJ_DIR)/token.o $(OBJ_DIR)/string.o $(OBJ_DIR)/error.o | $(BUILD_DIR)
 	$(CC) $(CFLAGS) $^ -o $@
-
-$(BUILD_DIR)/scan_append: $(OBJ_DIR)/scanner.o $(OBJ_DIR)/token.o $(OBJ_DIR)/string.o $(OBJ_DIR)/error.o $(OBJ_DIR)/scan_append.o
-	$(CC) $(CFLAGS) $^ -o $@
-
-# Spuštění (stdin)
-lex-driver: $(BUILD_DIR)/scan_driver
-	@echo '>>> scan_driver: reading from stdin (Ctrl-D to end)'
-	./$(BUILD_DIR)/scan_driver
-
-lex-append: $(BUILD_DIR)/scan_append
-	@echo '>>> scan_append: reading from stdin (Ctrl-D to end)'
-	./$(BUILD_DIR)/scan_append
-
-# ---- scan_dump (plný výpis)
-build/obj/scan_dump.o: ../test/scan_dump.c | $(OBJ_DIR)
-	$(CC) $(CFLAGS) -c ../test/scan_dump.c -o build/obj/scan_dump.o
-
-build/scan_dump: build/obj/scan_dump.o build/obj/scanner.o build/obj/token.o build/obj/string.o build/obj/error.o | $(BUILD_DIR)
-	$(CC) $(CFLAGS) build/obj/scan_dump.o build/obj/scanner.o build/obj/token.o build/obj/string.o build/obj/error.o -o build/scan_dump
 
 .PHONY: lex-dump
-lex-dump: build/scan_dump
+lex-dump: $(BUILD_DIR)/scan_dump
 	@if [ -z "$(FILE)" ]; then \
-		echo 'Usage: make lex-dump FILE=../test/sample.txt'; \
+		echo 'Usage: make lex-dump FILE=../test/lex/ok/ids_basic.wren'; \
 	else \
 		echo '>>> Running scan_dump on $(FILE)'; \
-		./build/scan_dump $(FILE); \
+		./$(BUILD_DIR)/scan_dump $(FILE); \
 	fi
+

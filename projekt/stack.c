@@ -39,11 +39,11 @@ void push(Stack *stack, ast_node *node){
 ///     @brief Take out the element from the top
 ///     @param stack the struct from which we take out
 ///     @return the node that we take out
-ast_node *pop(Stack *stack){
+ast_node pop(Stack *stack){
     if(stack->top == -1){
         return NULL;
     }
-    return stack->data[stack->top--];
+    return stack->data[--stack->top];
 }
 
 ///     @brief Return the element from the top (without change in the stack)

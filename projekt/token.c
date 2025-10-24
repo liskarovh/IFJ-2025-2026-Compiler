@@ -32,7 +32,11 @@ tokenPtr token_create(void) {
 /// @param t token to print
 void token_format_string(tokenPtr t) {
     printf("Token type: %d\n", t->type);
-    printf("Token value: %s\n", t->value->data);
+    if(t->value) {
+        printf("Token value: %s\n", t->value->data);
+    } else {
+        printf("Token value: (null)\n");
+    }
     printf("Token value_float: %f\n", t->value_float);
     printf("Token value_int: %lld\n", t->value_int);
     printf("\n");
@@ -173,4 +177,20 @@ void DLLTokens_Print(DLListTokens *list) {
         token_format_string(tmp->token);
         tmp = tmp->next;
     }
+}
+
+/// @brief Gets the token type of the active token, ignoring EOL tokens
+/// @param tokenList The list of tokens
+/// @return The token type of the active token, or T_NONE if there are no valid tokens
+token_type get_token_type_ignore_eol(DLListTokens *tokenList) {
+    DLLTokenElementPtr current = tokenList->active;
+
+    while (current != NULL) {
+        if (current->token->type != T_EOL) {
+            return current->token->type;
+        }
+        current = current->next;
+    }
+
+    return T_NONE;
 }

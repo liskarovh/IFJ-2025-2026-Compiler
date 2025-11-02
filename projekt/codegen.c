@@ -572,10 +572,6 @@ void generate_node(ast_node node, generator gen){
             generate_while(gen, node);
             break;
 
-        case AST_EXPRESSION:
-            generate_expression(gen, "", node->expression);
-            break;
-
         case AST_CALL_FUNCTION:
             generate_function_call(gen, node);
             break;

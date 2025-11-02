@@ -273,8 +273,6 @@ void generate_unary(generator gen, char * result, ast_expression node){
     operation = node->type;
 
     generate_expression(gen, "GF@tmp_op", expr);
-    // TODO: generate_expression needs ast_node, not ast_expression
-    //       create custon ast_node and pass it ast_expression
 
     switch (operation) { //switch of all operators
         case AST_NOT:
@@ -296,11 +294,7 @@ void generate_binary(generator gen, char * result, ast_expression node){
     
 
     generate_expression(gen, "GF@tmp_l", left); //left expression
-    // TODO: generate_expression needs ast_node, not ast_expression
-    //       create custon ast_node and pass it ast_expression
     generate_expression(gen, "GF@tmp_r", right); //right expression
-    // TODO: generate_expression needs ast_node, not ast_expression
-    //       create custon ast_node and pass it ast_expression
 
     switch (operation) { //switch of all operators
         case AST_ADD:
@@ -348,22 +342,14 @@ void generate_binary(generator gen, char * result, ast_expression node){
     }
 }
 
-void generate_expression(generator gen, char * result, ast_node node){
-    ast_expression expr;
-    if(node->condition) //generate expression from condition
-        expr = node->condition->condition;
-    else if(node->while_loop) //generate expression from loop
-        expr = node->while_loop->condition;
-    else if(node->assignment)
-        expr = node->assignment->value;
-    else expr = node->expression
+void generate_expression(generator gen, char * result, ast_expression node){
 
-    switch(get_op_arity(expr->type)){
+    switch(get_op_arity(node->type)){
         case ARITY_UNARY:
-            generate_unary(gen, result, expr); //only one variable
+            generate_unary(gen, result, node); //only one variable
             break;
         case ARITY_BINARY:
-            generate_binary(gen, result, expr); //two variables
+            generate_binary(gen, result, node); //two variables
             break;
         default:
             break;
@@ -443,20 +429,20 @@ void generate_assignment(generator gen, ast_node node){
     string_append_literal(name, node->assignment->name);
     string value = string_create(10);
     if(node->assignment->expression != NULL){
-        if(node->assignment->expression->expression->value){ //not expression
+        if(node->assignment->value->identitfier){ //not expression
             if(node->assignment->expression->expression->type != AST_NIL){
-                if (value, node->assignment->expression->value->number_val)
-                    string_append_literal(value, node->assignment->expression->value->number_val);
-                else
-                    string_append_literal(value, node->assignment->expression->value->string_value);
+                string_append_literal(value, node->assignment->value->identifier);
             }
             else{
                 string_append_literal(value, "nil@nil");
             }
             move_var(gen, name->data, value->data); //move LF@var value
         }
+        else if(node->assignment->value->identity){
+            move_var(gen, node->assignment->value->identity->string_value, value->data);
+        }
         else{ //expression
-            generate_expression(gen, name->data, node->assignment->expression); //expression
+            generate_expression(gen, name->data, node->assignment->value); //expression
         }
     }   
     string_destroy(name);
@@ -490,7 +476,7 @@ void generate_if_statement(generator gen, ast_node node){
     
     //create condition
     string_append_literal(gen->output, "\n# IF CONDITION\n");
-    generate_expression(gen, "GF@tmp_if", node); //creates the condition
+    generate_expression(gen, "GF@tmp_if", node->condition->condition); //creates the condition
     add_jumpifeq(gen, else_lable->data, "GF@tmp_if", "bool@false");
     string_append_literal(gen->output, "# IF CONDITION END\n\n");
 
@@ -538,7 +524,7 @@ void generate_while(generator gen, ast_node node){
     
     string_append_literal(gen->output, "\n# WHILE LOOP START\n");
     
-    generate_expression(gen, "GF@tmp_while", node); //creates the condition
+    generate_expression(gen, "GF@tmp_while", node->while_loop->condition); //creates the condition
     add_jumpifeq(gen, while_end->data, "GF@tmp_while", "bool@false");
 
     string_append_literal(gen->output, "\n");
@@ -554,7 +540,7 @@ void generate_while(generator gen, ast_node node){
 
 
     string_append_literal(gen->output, "\n");
-    generate_expression(gen, "GF@tmp_while", node); //creates the condition
+    generate_expression(gen, "GF@tmp_while", node->while_loop->condition); //creates the condition
     add_jumpifneq(gen, while_start->data, "GF@tmp_while", "bool@false");
 
     label(gen, while_end->data); //end lable
@@ -587,7 +573,7 @@ void generate_node(ast_node node, generator gen){
             break;
 
         case AST_EXPRESSION:
-            generate_expression(gen, "", node);
+            generate_expression(gen, "", node->expression);
             break;
 
         case AST_CALL_FUNCTION:

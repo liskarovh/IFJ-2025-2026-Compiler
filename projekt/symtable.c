@@ -22,7 +22,7 @@ unsigned st_hash(char *key) {
 
 symtable *st_init(void){
     symtable *table = malloc(sizeof(symtable));
-    if (table == NULL) return NULL;
+    if (table == NULL) return NULL;`
     
     table->table = calloc(SYMTABLE_SIZE,sizeof(st_symbol));
     if(table->table == NULL){

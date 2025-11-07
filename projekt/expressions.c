@@ -77,35 +77,45 @@ prec_table_enum token_to_expr(tokenPtr token) {
 
 bool reduce_rule(stack *stack) {
     if (stack->top && stack->top->next && stack->top->next->next) {
-        prec_table_enum top    = stack->top->data;
-        prec_table_enum middle = stack->top->next->data;
-        prec_table_enum bottom = stack->top->next->next->data;
+        prec_table_enum top    = *(prec_table_enum *)stack->top->data;
+        prec_table_enum middle = *(prec_table_enum *)stack->top->next->data;
+        prec_table_enum bottom = *(prec_table_enum *)stack->top->next->next->data;
 
         if (top == ID && bottom == ID) {
             switch (middle) {
                 case PLUS: case MINUS: case MUL: case DIV:
                 case LT: case LTEQ: case GT: case GTEQ:
-                case EQ: case N_EQ: case IS:
-                    stack_pop(stack);
-                    stack_pop(stack);
-                    stack_pop(stack);
-                    stack_push(stack, ID);
+                case EQ: case N_EQ: case IS: {
+                    void *p;
+                    p = stack_pop(stack); if (p) free(p);
+                    p = stack_pop(stack); if (p) free(p);
+                    p = stack_pop(stack); if (p) free(p);
+                    prec_table_enum id = ID;
+                    stack_push_value(stack, &id, sizeof(id));
                     return true;
+                }
+                default:
+                    break;
             }
         }
 
         // ( E )
         if (top == RIGHT_PAREN && middle == ID && bottom == LEFT_PAREN) {
-            stack_pop(stack);
-            stack_pop(stack);
-            stack_pop(stack);
-            stack_push(stack, ID);
+            void *p;
+            p = stack_pop(stack); if (p) free(p);
+            p = stack_pop(stack); if (p) free(p);
+            p = stack_pop(stack); if (p) free(p);
+            prec_table_enum id = ID;
+            stack_push_value(stack, &id, sizeof(id));
             return true;
         }
     }
 
-    if (stack_top(stack) == ID)
-        return true;
+    void *topdata = stack_top(stack);
+    if (topdata) {
+        if (*(prec_table_enum *)topdata == ID)
+            return true;
+    }
 
     return false;
 }
@@ -114,28 +124,35 @@ bool reduce_rule(stack *stack) {
 
 
 int parse_expr(DLListTokens *tokenlist){
-    stack *stack;
+    stack stack;
     stack_init(&stack);
 
-    stack_push(&stack, DOLLAR);
+    prec_table_enum dollar = DOLLAR;
+    stack_push_value(&stack, &dollar, sizeof(dollar));
 
     tokenPtr token = tokenlist->active->token;
 
     prec_table_enum input = token_to_expr(token);
     while (1){
-    char rel = prec_table[get_prec_index(*(prec_table_enum *)stack_top(stack))][get_prec_index(input)];
-   
-    if(rel == '<' || rel == '='){
-        stack_push(stack,&input);
-        DLLTokens_Next(tokenlist);
-        token = tokenlist->active->token;
-        input = token_to_expr(token);
-    }
+        void *topdata = stack_top(&stack);
+        if (!topdata) return ERR_SYN;
+        prec_table_enum top_sym = *(prec_table_enum *)topdata;
 
-    else if( rel == '>'){ 
-    if(!reduce_rule(&stack)) return ERR_SYN;
+        char rel = prec_table[get_prec_index(top_sym)][get_prec_index(input)];
+
+        if(rel == '<' || rel == '='){
+            /* push a copy of input */
+            stack_push_value(&stack, &input, sizeof(input));
+            DLLTokens_Next(tokenlist);
+            token = tokenlist->active->token;
+            input = token_to_expr(token);
+        }
+
+        else if( rel == '>'){ 
+            if(!reduce_rule(&stack)) return ERR_SYN;
+        }
+
+        if ( (*(prec_table_enum *)stack_top(&stack) == DOLLAR) && input == DOLLAR) break;
     }
-    if (stack_top(&stack) == DOLLAR && input == DOLLAR) break;
-}
     return 0;
 }

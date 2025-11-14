@@ -16,22 +16,22 @@ enum ast_node_type {
     AST_BLOCK,
     AST_CONDITION,
     AST_WHILE_LOOP,
+    AST_BREAK,
+    AST_CONTINUE,
     AST_EXPRESSION,
     AST_VAR_DECLARATION,
     AST_ASSIGNMENT,
     AST_FUNCTION,
     AST_CALL_FUNCTION,
-    AST_RETURN
+    AST_RETURN,
+    AST_GETTER,
+    AST_SETTER
 };
 
-enum ast_expression_type {
+typedef enum {
     AST_NONE,
     AST_NIL,
-    AST_IDENTIFIER,
-    AST_STRING,
-    AST_BOOL,
-    AST_INTEGER,
-    AST_DOUBLE,
+    AST_VALUE,
     AST_FUNCTION_CALL,
     AST_NOT_NULL,
     AST_NOT,
@@ -48,11 +48,17 @@ enum ast_expression_type {
     AST_TERNARY,
     AST_AND,
     AST_OR,
-    AST_CONCAT
-};
+    AST_IS
+} ast_expression_type;
+
+typedef enum {
+    AST_VALUE_INT,
+    AST_VALUE_FLOAT,
+    AST_VALUE_STRING
+} ast_value_type;
 
 typedef struct ast_expression {
-    enum ast_expression_type type;
+    ast_expression_type type;
     union {
         struct ast_binary_operation {
             struct ast_expression *left;
@@ -62,8 +68,10 @@ typedef struct ast_expression {
             struct ast_expression *expression;
         } unary_op;
         struct ast_value {
+            ast_value_type value_type;
             union {
-                double number_val;
+                int int_value;
+                double double_value;
                 char *string_value;
             } value;
         } identity;
@@ -92,7 +100,7 @@ typedef struct ast_node {
 
         struct ast_while {
             struct ast_expression *condition;
-            struct ast_sequence *proceed;
+            struct ast_block *body;
         } while_loop;
 
         struct ast_expression *expression;
@@ -113,6 +121,17 @@ typedef struct ast_node {
         struct ast_return {
             ast_expression output;
         } return_expr;
+
+        struct ast_getter {
+            char *name;
+            struct ast_block *body;
+        } getter;
+
+        struct ast_setter {
+            char *name;
+            char *param;
+            struct ast_block *body;
+        } setter;
     } data;
 } *ast_node;
 
@@ -199,6 +218,10 @@ void ast_block_dispose(ast_block block_node);
 /// @param node pointer to the AST node
 void ast_node_dispose(ast_node node);
 
+/// @brief Disposes of an expression node
+/// @param expr pointer to the expression node
+void ast_expression_dispose(ast_expression expr);
+
 /// @brief Prints the AST
 /// @param tree pointer to the AST
 void ast_print(ast tree);
@@ -217,5 +240,10 @@ void ast_print_block(ast_block block_node, char *offset);
 /// @param node pointer to the AST node
 /// @param offset offset for printing
 void ast_print_node(ast_node node, char *offset);
+
+/// @brief Prints an AST expression
+/// @param expr pointer to the AST expression
+/// @param offset offset for printing
+void ast_print_expression(ast_expression expr, char *offset);
 
 #endif // AST_H

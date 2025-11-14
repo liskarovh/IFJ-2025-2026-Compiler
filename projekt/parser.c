@@ -9,6 +9,7 @@
 
 #include "parser.h"
 #include "error.h"
+#include "expressions.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -26,7 +27,7 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
     while(tokenList->active->token->type == T_EOL) {
         DLLTokens_Next(tokenList);
     }
-    token_format_string(tokenList->active->token);
+    // token_format_string(tokenList->active->token);
 
     switch (expected_rule)
     {
@@ -137,6 +138,10 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
             return ERR_SYN;
         }
         DLLTokens_Next(tokenList);
+        if(tokenList->active->token->type != T_EOL) {
+            return ERR_SYN;
+        }
+
         while (tokenList->active->token->type == T_EOL)
         {
             DLLTokens_Next(tokenList);
@@ -193,9 +198,12 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
             get_token_type_ignore_eol(tokenList) == T_KW_STATIC ||
             get_token_type_ignore_eol(tokenList) == T_KW_VAR ||
             get_token_type_ignore_eol(tokenList) == T_IDENT ||
+            get_token_type_ignore_eol(tokenList) == T_GLOB_IDENT ||
             get_token_type_ignore_eol(tokenList) == T_KW_IF ||
             get_token_type_ignore_eol(tokenList) == T_KW_FOR ||
             get_token_type_ignore_eol(tokenList) == T_KW_WHILE ||
+            get_token_type_ignore_eol(tokenList) == T_KW_BREAK ||
+            get_token_type_ignore_eol(tokenList) == T_KW_CONTINUE ||
             get_token_type_ignore_eol(tokenList) == T_KW_RETURN ||
             get_token_type_ignore_eol(tokenList) == T_LBRACE
         ) {
@@ -208,9 +216,22 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
     }
     case GRAMMAR_COMMAND: {
         if (tokenList->active->token->type == T_KW_STATIC) {
-            int err = parser(tokenList, out_ast, GRAMMAR_FUN_DEF);
-            if (err != SUCCESS) {
-                return err;
+            if(tokenList->active->next->next->token->type == T_LBRACE) {
+                int err = parser(tokenList, out_ast, GRAMMAR_GETTER);
+                if( err != SUCCESS) {
+                    return err;
+                }
+            } else if(tokenList->active->next->next->token->type == T_ASSIGN) {
+                int err = parser(tokenList, out_ast, GRAMMAR_SETTER);
+                if( err != SUCCESS) {
+                    return err;
+                }
+            }
+            else {
+                int err = parser(tokenList, out_ast, GRAMMAR_FUN_DEF);
+                if (err != SUCCESS) {
+                    return err;
+                }
             }
         }
         else if (tokenList->active->token->type == T_KW_VAR) {
@@ -219,7 +240,8 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
                 return err;
             }
         }
-        else if (tokenList->active->token->type == T_IDENT) {
+        else if (tokenList->active->token->type == T_IDENT ||
+                 tokenList->active->token->type == T_GLOB_IDENT) {
             if(tokenList->active->next->token->type == T_ASSIGN) {
                 int err = parser(tokenList, out_ast, GRAMMAR_ASSIGNMENT);
                 if (err != SUCCESS) {
@@ -250,6 +272,14 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
             if (err != SUCCESS) {
                 return err;
             }
+        }
+        else if (tokenList->active->token->type == T_KW_BREAK) {
+            DLLTokens_Next(tokenList);
+            ast_add_new_node(&current_class, AST_BREAK);
+        }
+        else if (tokenList->active->token->type == T_KW_CONTINUE) {
+            DLLTokens_Next(tokenList);
+            ast_add_new_node(&current_class, AST_CONTINUE);
         }
         else if (tokenList->active->token->type == T_KW_RETURN) {
             int err = parser(tokenList, out_ast, GRAMMAR_RETURN);
@@ -398,9 +428,192 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
         }
         DLLTokens_Next(tokenList);
         ast_add_new_node(&current_class, AST_RETURN);
+
+        if(tokenList->active->token->type == T_EOL) {
+            current_class->current->current->data.return_expr.output = NULL;
+        } else {
+            ast_expression return_expression; 
+            int err = parse_expr(tokenList, &return_expression);
+            if (err != SUCCESS) {
+                return err;
+            }
+            current_class->current->current->data.return_expr.output = return_expression;
+        }
+
+        break;
+    }
+    case GRAMMAR_ASSIGNMENT: {
+        ast_add_new_node(&current_class, AST_ASSIGNMENT);
+        current_class->current->current->data.assignment.name = tokenList->active->token->value->data;
+
+        DLLTokens_Next(tokenList);
+
+        if (tokenList->active->token->type != T_ASSIGN) {
+            return ERR_SYN;
+        }
+        DLLTokens_Next(tokenList);
+
+        ast_expression current_expression; 
+        int err = parse_expr(tokenList, &current_expression);
+        if (err != SUCCESS) {
+            return err;
+        }
+        current_class->current->current->data.assignment.value = current_expression;
+
+        break;
+    }
+    case GRAMMAR_CONDITION: {
+        if(tokenList->active->token->type != T_KW_IF) {
+            return ERR_SYN;
+        }
+        DLLTokens_Next(tokenList);
+
+        if(tokenList->active->token->type != T_LPAREN) {
+            return ERR_SYN;
+        }
+        DLLTokens_Next(tokenList);
+
+        ast_add_new_node(&current_class, AST_CONDITION);
+
+        ast_expression condition_expression; 
+        int err = parse_expr(tokenList, &condition_expression);
+        if (err != SUCCESS) {
+            return err;
+        }
+
+        current_class->current->current->data.condition.condition = condition_expression;
+
+        if(tokenList->active->token->type != T_RPAREN) {
+            return ERR_SYN;
+        }
+        DLLTokens_Next(tokenList);
+
+        current_class->current = current_class->current->current->data.condition.if_branch;
+
+        has_own_block = true;
+        err = parser(tokenList, out_ast, GRAMMAR_BODY);
+        if (err != SUCCESS) {
+            return err;
+
+        }
+
+        if(tokenList->active->token->type != T_KW_ELSE) {
+            return ERR_SYN;
+        }
+        DLLTokens_Next(tokenList);
+
+        current_class->current = current_class->current->current->data.condition.else_branch;
+        has_own_block = true;
+        err = parser(tokenList, out_ast, GRAMMAR_BODY);
+        if (err != SUCCESS) {
+            return err;
+
+        }
+
+        break;
+    }
+    case GRAMMAR_WHILE: {
+        if(tokenList->active->token->type != T_KW_WHILE) {
+            return ERR_SYN;
+        }
+        DLLTokens_Next(tokenList);
+
+        if(tokenList->active->token->type != T_LPAREN) {
+            return ERR_SYN;
+        }
+        DLLTokens_Next(tokenList);
+
+        ast_add_new_node(&current_class, AST_WHILE_LOOP);
+
+        ast_expression while_expression; 
+        int err = parse_expr(tokenList, &while_expression);
+        if (err != SUCCESS) {
+            return err;
+        }
+
+        current_class->current->current->data.while_loop.condition = while_expression;
+
+        if(tokenList->active->token->type != T_RPAREN) {
+            return ERR_SYN;
+        }
+        DLLTokens_Next(tokenList);
+
+        current_class->current = current_class->current->current->data.while_loop.body;
+
+        has_own_block = true;
+        err = parser(tokenList, out_ast, GRAMMAR_BODY);
+        if (err != SUCCESS) {
+            return err;
+
+        }
         
-        //TODO
-        current_class->current->current->data.return_expr.output = NULL;
+        break;
+    }
+    case GRAMMAR_GETTER: {
+        if(tokenList->active->token->type != T_KW_STATIC) {
+            return ERR_SYN;
+        }
+        DLLTokens_Next(tokenList);
+
+        if(tokenList->active->token->type != T_IDENT) {
+            return ERR_SYN;
+        }
+
+        ast_add_new_node(&current_class, AST_GETTER);
+        current_class->current->current->data.getter.name = tokenList->active->token->value->data;
+        DLLTokens_Next(tokenList);
+
+        current_class->current = current_class->current->current->data.getter.body;
+
+        has_own_block = true;
+        int err = parser(tokenList, out_ast, GRAMMAR_BODY);
+        if (err != SUCCESS) {
+            return err;
+        }
+
+        break;
+    }
+    case GRAMMAR_SETTER: {
+        if(tokenList->active->token->type != T_KW_STATIC) {
+            return ERR_SYN;
+        }
+        DLLTokens_Next(tokenList);
+
+        if(tokenList->active->token->type != T_IDENT) {
+            return ERR_SYN;
+        }
+
+        ast_add_new_node(&current_class, AST_SETTER);
+        current_class->current->current->data.setter.name = tokenList->active->token->value->data;
+        DLLTokens_Next(tokenList);
+
+        if(tokenList->active->token->type != T_ASSIGN) {
+            return ERR_SYN;
+        }
+        DLLTokens_Next(tokenList);
+        if(tokenList->active->token->type != T_LPAREN) {
+            return ERR_SYN;
+        }
+        
+        DLLTokens_Next(tokenList);
+        if(tokenList->active->token->type != T_IDENT) {
+            return ERR_SYN;
+        }
+        current_class->current->current->data.setter.param = tokenList->active->token->value->data;
+        DLLTokens_Next(tokenList);
+        
+        if(tokenList->active->token->type != T_RPAREN) {
+            return ERR_SYN;
+        }
+        DLLTokens_Next(tokenList);
+
+        current_class->current = current_class->current->current->data.setter.body;
+
+        has_own_block = true;
+        int err = parser(tokenList, out_ast, GRAMMAR_BODY);
+        if (err != SUCCESS) {
+            return err;
+        }
 
         break;
     }

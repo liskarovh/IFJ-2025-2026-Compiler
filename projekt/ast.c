@@ -94,12 +94,30 @@ void ast_add_new_node(ast_class *class_node, enum ast_node_type type) {
         break;
     case AST_CONDITION: 
         new_node->data.condition.condition = NULL;
-        new_node->data.condition.if_branch = NULL;
-        new_node->data.condition.else_branch = NULL;
+        new_node->data.condition.if_branch = malloc(sizeof(struct ast_block));
+        new_node->data.condition.if_branch->first = NULL;
+        new_node->data.condition.if_branch->current = NULL;
+        new_node->data.condition.if_branch->next = NULL;
+        new_node->data.condition.if_branch->parent = (*class_node)->current;
+        new_node->data.condition.else_branch = malloc(sizeof(struct ast_block));
+        new_node->data.condition.else_branch->first = NULL;
+        new_node->data.condition.else_branch->current = NULL;
+        new_node->data.condition.else_branch->next = NULL;
+        new_node->data.condition.else_branch->parent = (*class_node)->current;
         break;
     case AST_WHILE_LOOP: 
         new_node->data.while_loop.condition = NULL;
-        new_node->data.while_loop.proceed = NULL;
+        new_node->data.while_loop.body = malloc(sizeof(struct ast_block));
+        new_node->data.while_loop.body->first = NULL;
+        new_node->data.while_loop.body->current = NULL;
+        new_node->data.while_loop.body->next = NULL;
+        new_node->data.while_loop.body->parent = (*class_node)->current;
+        break;
+    case AST_BREAK:
+        // No additional data needed for BREAK
+        break;
+    case AST_CONTINUE:
+        // No additional data needed for CONTINUE
         break;
     case AST_EXPRESSION: 
         new_node->data.expression = NULL;
@@ -129,6 +147,22 @@ void ast_add_new_node(ast_class *class_node, enum ast_node_type type) {
     case AST_RETURN: 
         new_node->data.return_expr.output = NULL;
         break;
+    case AST_GETTER:
+        new_node->data.getter.name = NULL;
+        new_node->data.getter.body = malloc(sizeof(struct ast_block));
+        new_node->data.getter.body->first = NULL;
+        new_node->data.getter.body->current = NULL;
+        new_node->data.getter.body->next = NULL;
+        new_node->data.getter.body->parent = (*class_node)->current;
+        break;
+    case AST_SETTER:
+        new_node->data.setter.name = NULL;
+        new_node->data.setter.param = NULL;
+        new_node->data.setter.body = malloc(sizeof(struct ast_block));
+        new_node->data.setter.body->first = NULL;
+        new_node->data.setter.body->current = NULL;
+        new_node->data.setter.body->next = NULL;
+        new_node->data.setter.body->parent = (*class_node)->current;
     }
 }
 
@@ -181,14 +215,23 @@ void ast_node_dispose(ast_node node) {
     case AST_BLOCK:
         break;
     case AST_CONDITION:
+        ast_block_dispose(node->data.condition.if_branch);
+        ast_block_dispose(node->data.condition.else_branch);
         break;
     case AST_WHILE_LOOP:
+        ast_block_dispose(node->data.while_loop.body);
+        break;
+    case AST_BREAK:
+        break;
+    case AST_CONTINUE:
         break;
     case AST_EXPRESSION:
+        ast_expression_dispose(node->data.expression);
         break;
     case AST_VAR_DECLARATION:
         break;
     case AST_ASSIGNMENT:
+        ast_expression_dispose(node->data.assignment.value);
         break;
     case AST_FUNCTION: {
         ast_parameter param = node->data.function->parameters;
@@ -211,7 +254,29 @@ void ast_node_dispose(ast_node node) {
     }
     case AST_RETURN:
         break;
+    case AST_GETTER:
+        ast_block_dispose(node->data.getter.body);
+        break;
+    case AST_SETTER:
+        ast_block_dispose(node->data.setter.body);
+        break;
     }
+}
+
+/// @brief Disposes of an expression node
+/// @param expr pointer to the expression node
+void ast_expression_dispose(ast_expression expr) {
+    if(expr == NULL) {
+        return;
+    }
+    
+    if(expr->type != AST_VALUE) {
+        ast_expression_dispose(expr->operands.binary_op.left);
+        ast_expression_dispose(expr->operands.binary_op.right);
+        return;
+    } 
+
+    free(expr);
 }
 
 /// @brief Prints the AST
@@ -277,18 +342,68 @@ void ast_print_node(ast_node node, char *offset) {
         ast_print_block(node->data.block, newOffset);
         break;
     }
-    case AST_CONDITION:
+    case AST_CONDITION: {
+        printf("%s    |\n", offset);
+        printf("%s    +-- CONDITION\n", offset);
+        printf("%s    |   |\n", offset);
+        printf("%s    |   +-- COND\n", offset);
+
+        char newOffset[100]; 
+        strcpy(newOffset, offset);
+        strcat(newOffset, "    |   |");
+        ast_print_expression(node->data.condition.condition, newOffset);
+
+        strcat(newOffset, "    ");
+        printf("%s    |   |\n", offset);
+        printf("%s    |   +-- BODY\n", offset);
+        ast_print_block(node->data.condition.if_branch, newOffset);
+
+        printf("%s    |   |\n", offset);
+        printf("%s    |   +-- ELSE\n", offset);
+        ast_print_block(node->data.condition.else_branch, newOffset);
+        
         break;
-    case AST_WHILE_LOOP:
+    }
+    case AST_WHILE_LOOP: {
+        printf("%s    |\n", offset);
+        printf("%s    +-- WHILE LOOP\n", offset);
+        printf("%s    |   |\n", offset);
+        printf("%s    |   +-- COND\n", offset);
+        char newOffset[100]; 
+        strcpy(newOffset, offset);
+        strcat(newOffset, "    |   |");
+        ast_print_expression(node->data.while_loop.condition, newOffset);
+
+        strcat(newOffset, "    ");
+        printf("%s    |   |\n", offset);
+        printf("%s    |   +-- BODY\n", offset);
+        ast_print_block(node->data.while_loop.body, newOffset);
+        break;
+    }
+    case AST_BREAK:
+        printf("%s    |\n", offset);
+        printf("%s    +-- BREAK\n", offset);
+        break;
+    case AST_CONTINUE:
+        printf("%s    |\n", offset);
+        printf("%s    +-- CONTINUE\n", offset);
         break;
     case AST_EXPRESSION:
+        ast_print_expression(node->data.expression, offset);
         break;
     case AST_VAR_DECLARATION:
         printf("%s    |\n", offset);
         printf("%s    +-- VAR DECLARATION (name: %s)\n", offset, node->data.declaration.name);
         break;
-    case AST_ASSIGNMENT:
+    case AST_ASSIGNMENT: {
+        printf("%s    |\n", offset);
+        printf("%s    +-- ASSIGNMENT (name: %s)\n", offset, node->data.assignment.name);
+        char newOffset[100]; 
+        strcpy(newOffset, offset);
+        strcat(newOffset, "    ");
+        ast_print_expression(node->data.assignment.value, newOffset);
         break;
+    }
     case AST_FUNCTION:
         printf("%s    |\n", offset);
         printf("%s    +-- FUNCTION (name: %s", offset, node->data.function->name);
@@ -327,7 +442,108 @@ void ast_print_node(ast_node node, char *offset) {
         break;
     case AST_RETURN:
         printf("%s    |\n", offset);
-        printf("%s    +-- RETURN\n", offset);
+        printf("%s    +-- RETURN", offset);
+        if(node->data.return_expr.output == NULL) {
+            printf(" (no output)\n");
+        } else {
+            printf("\n");
+            char newOffset[100]; 
+            strcpy(newOffset, offset);
+            strcat(newOffset, "    ");
+            ast_print_expression(node->data.return_expr.output, newOffset);
+        }
         break;
+    case AST_GETTER: {
+        printf("%s    |\n", offset);
+        printf("%s    +-- GETTER (name: %s)\n", offset, node->data.getter.name);
+        
+        char newOffset[100]; 
+        strcpy(newOffset, offset);
+        strcat(newOffset, "        ");
+        ast_print_block(node->data.getter.body, newOffset);
+
+        break;
+    }
+    case AST_SETTER: {
+        printf("%s    |\n", offset);
+        printf("%s    +-- SETTER (name: %s)\n", offset, node->data.setter.name);
+
+        printf("%s        |    \n", offset);
+        printf("%s        +--- PARAM: %s\n", offset, node->data.setter.param);
+
+        char newOffset[100]; 
+        strcpy(newOffset, offset);
+        strcat(newOffset, "        ");
+        ast_print_block(node->data.setter.body, newOffset);
+
+        break;
+    }
+    }
+}
+
+char *get_operator_symbol(ast_expression_type type) {
+    switch (type)
+    {
+    case AST_ADD:
+        return "+";
+    case AST_SUB:
+        return "-";
+    case AST_MUL:
+        return "*";
+    case AST_DIV:
+        return "/";
+    case AST_EQUALS:
+        return "==";
+    case AST_NOT_EQUAL:
+        return "!=";
+    case AST_LT:
+        return "<";
+    case AST_LE:
+        return "<=";
+    case AST_GT:
+        return ">";
+    case AST_GE:
+        return ">=";
+    case AST_IS:
+        return "is";
+    case AST_VALUE:
+        return "VALUE";
+    default:
+        return "UNKNOWN";
+    }
+}
+
+/// @brief Prints an AST expression
+/// @param expr pointer to the AST expression
+/// @param offset offset for printing
+void ast_print_expression(ast_expression expr, char *offset) {
+    printf("%s    |\n", offset);
+    printf("%s    +-- EXPRESSION", offset);
+    
+    if(expr == NULL) {
+        printf(" (NULL)\n");
+    } else {
+        printf(" (type: %s)\n", get_operator_symbol(expr->type));
+        char newOffset[100]; 
+        strcpy(newOffset, offset);
+        strcat(newOffset, "    |");
+
+        if(expr->type == AST_VALUE) {
+            printf("%s    |\n", newOffset);
+            printf("%s    +-- VALUE: ", newOffset);
+            if(expr->operands.identity.value_type == AST_VALUE_INT) {
+                printf("%d\n", expr->operands.identity.value.int_value);
+            } else if(expr->operands.identity.value_type == AST_VALUE_FLOAT) {
+                printf("%f\n", expr->operands.identity.value.double_value);
+            } else if(expr->operands.identity.value_type == AST_VALUE_STRING) {
+                printf("%s\n", expr->operands.identity.value.string_value);
+            } else {
+                printf("UNKNOWN TYPE\n");
+            }
+            
+        } else {
+                ast_print_expression(expr->operands.binary_op.left, newOffset);
+                ast_print_expression(expr->operands.binary_op.right, newOffset);
+        }
     }
 }

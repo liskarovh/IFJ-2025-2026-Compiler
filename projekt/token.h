@@ -157,4 +157,9 @@ void DLLTokens_Next(DLListTokens *list);
 /// @param list list to print
 void DLLTokens_Print(DLListTokens *list);
 
+/// @brief Gets the token type of the active token, ignoring EOL tokens
+/// @param tokenList The list of tokens
+/// @return The token type of the active token, or T_NONE if there are no valid tokens
+token_type get_token_type_ignore_eol(DLListTokens *tokenList);
+
 #endif // TOKEN_H

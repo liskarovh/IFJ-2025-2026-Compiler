@@ -91,17 +91,23 @@ bool reduce_rule(stack *stack) {
     if(top.symbol == ID || top.symbol == INT || top.symbol == FLOAT || top.symbol == STRING) {
         expr_item item = *(expr_item *)stack_pop(stack);
         item.expr = malloc(sizeof(struct ast_expression));
-        item.expr->type = AST_VALUE;
-        item.expr->operands.identity.value_type = 
-            (item.symbol == INT) ? AST_VALUE_INT :
-            (item.symbol == FLOAT) ? AST_VALUE_FLOAT :
-            AST_VALUE_STRING;
-        if(item.symbol == INT) {
-            item.expr->operands.identity.value.int_value = item.token->value_int;
-        } else if(item.symbol == FLOAT) {
-            item.expr->operands.identity.value.double_value = item.token->value_float;
+
+        if(top.symbol == ID) {
+            item.expr->type = AST_IDENTIFIER;
+            item.expr->operands.identifier.value = item.token->value->data;
         } else {
-            item.expr->operands.identity.value.string_value = item.token->value->data;
+            item.expr->type = AST_VALUE;
+            item.expr->operands.identity.value_type = 
+                (item.symbol == INT) ? AST_VALUE_INT :
+                (item.symbol == FLOAT) ? AST_VALUE_FLOAT :
+                AST_VALUE_STRING;
+            if(item.symbol == INT) {
+                item.expr->operands.identity.value.int_value = item.token->value_int;
+            } else if(item.symbol == FLOAT) {
+                item.expr->operands.identity.value.double_value = item.token->value_float;
+            } else {
+                item.expr->operands.identity.value.string_value = item.token->value->data;
+            }
         }
         item.symbol = EXPR;
 

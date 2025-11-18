@@ -242,7 +242,13 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
         }
         else if (tokenList->active->token->type == T_IDENT ||
                  tokenList->active->token->type == T_GLOB_IDENT) {
-            if(tokenList->active->next->token->type == T_ASSIGN) {
+            if(strcmp(tokenList->active->token->value->data, "Ifj") == 0) {
+                int err = parser(tokenList, out_ast, GRAMMAR_IFJ_CALL);
+                if (err != SUCCESS) {
+                    return err;
+                }
+            }
+            else if(tokenList->active->next->token->type == T_ASSIGN) {
                 int err = parser(tokenList, out_ast, GRAMMAR_ASSIGNMENT);
                 if (err != SUCCESS) {
                     return err;
@@ -306,13 +312,14 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
             return ERR_SYN;
         }
         current_function->name = tokenList->active->token->value->data;
-        current_class->current = current_function->code;
         DLLTokens_Next(tokenList);
 
         int err = parser(tokenList, out_ast, GRAMMAR_PARAMS);
         if (err != SUCCESS) {
             return err;
         }
+        
+        current_class->current = current_function->code;
 
         has_own_block = true;
         err = parser(tokenList, out_ast, GRAMMAR_BODY);
@@ -371,6 +378,21 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
                     current_fun_call->parameters->next = NULL;
                 } else {
                     ast_parameter param_iter = current_fun_call->parameters;
+                    while(param_iter->next != NULL) {
+                        param_iter = param_iter->next;
+                    }
+                    param_iter->next = malloc(sizeof(struct ast_parameter));
+                    param_iter->next->name = tokenList->active->token->value->data;
+                    param_iter->next->next = NULL;
+                }
+            } else if(current_class->current->current->type == AST_IFJ_FUNCTION) {
+                ast_ifj_function current_ifj_function = current_class->current->current->data.ifj_function;
+                if(current_ifj_function->parameters == NULL) {
+                    current_ifj_function->parameters = malloc(sizeof(struct ast_parameter));
+                    current_ifj_function->parameters->name = tokenList->active->token->value->data;
+                    current_ifj_function->parameters->next = NULL;
+                } else {
+                    ast_parameter param_iter = current_ifj_function->parameters;
                     while(param_iter->next != NULL) {
                         param_iter = param_iter->next;
                     }
@@ -616,6 +638,32 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
         }
 
         break;
+    }
+    case GRAMMAR_IFJ_CALL: {
+        if(tokenList->active->token->type != T_IDENT || strcmp(tokenList->active->token->value->data, "Ifj") != 0) {
+            return ERR_SYN;
+        }
+        DLLTokens_Next(tokenList);
+        
+        if(tokenList->active->token->type != T_DOT) {
+            return ERR_SYN;
+        }
+        DLLTokens_Next(tokenList);
+
+        if(tokenList->active->token->type != T_IDENT) {
+            return ERR_SYN;
+        }
+
+        ast_add_new_node(&current_class, AST_IFJ_FUNCTION);
+        current_class->current->current->data.ifj_function->name = tokenList->active->token->value->data;
+        DLLTokens_Next(tokenList);
+
+        int err = parser(tokenList, out_ast, GRAMMAR_PARAMS);
+        if (err != SUCCESS) {
+            return err;
+        }
+        
+        return SUCCESS;
     }
     default:
         break;

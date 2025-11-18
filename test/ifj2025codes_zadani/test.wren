@@ -15,7 +15,7 @@ class Program {
             funcke(a, b)
             {
                 main()
-                return
+                //return
             }
 
             funcke(a, b)

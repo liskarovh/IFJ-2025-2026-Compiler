@@ -88,7 +88,7 @@ bool reduce_rule(stack *stack) {
     }
 
     expr_item top = *(expr_item *)stack->top->data;
-    if(top.symbol == ID || top.symbol == INT || top.symbol == FLOAT || top.symbol == STRING) {
+    if(top.symbol == INT || top.symbol == FLOAT || top.symbol == STRING) {
         expr_item item = *(expr_item *)stack_pop(stack);
         item.expr = malloc(sizeof(struct ast_expression));
         item.expr->type = AST_VALUE;
@@ -103,6 +103,21 @@ bool reduce_rule(stack *stack) {
         } else {
             item.expr->operands.identity.value.string_value = item.token->value->data;
         }
+        item.symbol = EXPR;
+
+        top = *(expr_item *)stack->top->data;
+        if(top.symbol == SHIFT_MARK) {
+            expr_item *p = (expr_item *)stack_pop(stack); 
+            if(p) free(p);
+        }
+
+        stack_push_value(stack, &item, sizeof(item));
+    }
+    else if(top.symbol == ID) {
+        expr_item item = *(expr_item *)stack_pop(stack);
+        item.expr = malloc(sizeof(struct ast_expression));
+        item.expr->type = AST_ID;
+        item.expr->operands.identifier.value = item.token->value->data;
         item.symbol = EXPR;
 
         top = *(expr_item *)stack->top->data;

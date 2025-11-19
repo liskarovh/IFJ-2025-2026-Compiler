@@ -14,12 +14,16 @@
 #include "parser.h"
 #include "token.h"
 #include "error.h"
+#include "ast.h"
+#include "semantic.h"
 
 
 int main() {
     FILE *source = fopen("../test/ifj2025codes_zadani/test.wren", "r");
     if (source == NULL) {
+        fprintf(stderr, "Error opening source file.\n");
         return ERR_INTERNAL;
+
     }
 
     DLListTokens token_list;
@@ -39,9 +43,22 @@ int main() {
     ast_init(&ast_tree);
 
     result = parser(&token_list, ast_tree, GRAMMAR_PROGRAM);
+    if (result != SUCCESS) {
+        ast_dispose(ast_tree);
+        DLLTokens_Dispose(&token_list);
+        fclose(source);
+        return result;
+    }
 
     ast_print(ast_tree);
 
+    result = semantic_pass1(ast_tree);
+    if (result != SUCCESS) {
+        ast_dispose(ast_tree);
+        DLLTokens_Dispose(&token_list);
+        fclose(source);
+        return result;
+    }
     ast_dispose(ast_tree);
     DLLTokens_Dispose(&token_list);
     fclose(source);

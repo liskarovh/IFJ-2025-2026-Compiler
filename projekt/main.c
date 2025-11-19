@@ -42,9 +42,6 @@ int main() {
 
     result = parser(&token_list, ast_tree, GRAMMAR_PROGRAM);
 
-    ast_print(ast_tree);
-
-
     init_code(gen, ast_tree);
     generate_code(gen, ast_tree);
     fputs(gen->output->data, stdout);

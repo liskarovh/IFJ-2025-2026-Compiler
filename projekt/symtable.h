@@ -25,7 +25,10 @@ typedef enum {
     ST_VAR,
     ST_CONST,
     ST_FUN,
-    ST_PAR
+    ST_PAR,
+    ST_GLOB,
+    ST_GETTER,
+    ST_SETTER
 }symbol_type;
 
 typedef struct st_data{
@@ -102,6 +105,22 @@ st_data *st_get(symtable *table, char *key);
  * @param table Pointer to the symbol table to free.
  */
 void st_free(symtable *table);
+
+/**
+ * @brief Print a human-readable dump of the symbol table.
+ *        Each occupied entry prints: index, key, kind, param_count (if any).
+ * @param table Symbol table to dump.
+ * @param out   Output stream (stdout/stderr/file).
+ */
+void      st_dump(symtable *table, FILE *out);
+
+typedef void (*st_iter_cb)(const char *key, st_data *data, void *user_data);
+
+/**
+ * @brief Iterate over all entries in the symbol table.
+ *        For each (key, data) calls cb(key, data, user_data).
+ */
+void st_foreach(symtable *t, st_iter_cb cb, void *user_data);
 
 
 #endif // SYMTABLE_H

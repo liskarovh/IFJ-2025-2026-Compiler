@@ -130,7 +130,7 @@ void ast_add_new_node(ast_class *class_node, enum ast_node_type type) {
         new_node->data.assignment.value = NULL;
         break;
     case AST_FUNCTION: 
-    new_node->data.function = malloc(sizeof(struct ast_function));
+        new_node->data.function = malloc(sizeof(struct ast_function));
         new_node->data.function->name = NULL;
         new_node->data.function->parameters = NULL;
         new_node->data.function->code = malloc(sizeof(struct ast_block));
@@ -163,6 +163,12 @@ void ast_add_new_node(ast_class *class_node, enum ast_node_type type) {
         new_node->data.setter.body->current = NULL;
         new_node->data.setter.body->next = NULL;
         new_node->data.setter.body->parent = (*class_node)->current;
+        break;
+    case AST_IFJ_FUNCTION:
+        new_node->data.ifj_function = malloc(sizeof(struct ast_ifj_function));
+        new_node->data.ifj_function->name = NULL;
+        new_node->data.ifj_function->parameters = NULL;
+        break;
     }
 }
 
@@ -264,6 +270,16 @@ void ast_node_dispose(ast_node node) {
     case AST_SETTER:
         ast_block_dispose(node->data.setter.body);
         break;
+    case AST_IFJ_FUNCTION: {
+        ast_parameter param = node->data.ifj_function->parameters;
+        while(param != NULL) {
+            ast_parameter to_free = param;
+            param = param->next;
+            free(to_free);
+        }
+        free(node->data.ifj_function);
+        break;
+    }
     }
 }
 
@@ -482,6 +498,23 @@ void ast_print_node(ast_node node, char *offset) {
 
         break;
     }
+    case AST_IFJ_FUNCTION: {
+        printf("%s    |\n", offset);
+        printf("%s    +-- IFJ FUNCTION (name: %s", offset, node->data.ifj_function->name);
+        if(node->data.ifj_function->parameters != NULL) {
+            printf(", parameters: ");
+            ast_parameter parameter = node->data.ifj_function->parameters;
+            while(parameter != NULL) {
+                printf("%s", parameter->name);
+                parameter = parameter->next;
+                if(parameter != NULL) {
+                    printf(", ");
+                }
+            }
+        }
+        printf(")\n");
+        break;
+    }
     }
 }
 
@@ -512,7 +545,7 @@ char *get_operator_symbol(ast_expression_type type) {
         return "is";
     case AST_VALUE:
         return "VALUE";
-    case AST_ID:
+    case AST_IDENTIFIER:
         return "ID";
     default:
         return "UNKNOWN";
@@ -552,7 +585,14 @@ void ast_print_expression(ast_expression expr, char *offset) {
             printf("%s    +-- VALUE: ", newOffset);
             printf("%s\n", expr->operands.identifier.value);
             
-        } else {
+        } else if(expr->type == AST_IDENTIFIER) {
+            printf("%s    |\n", newOffset);
+            printf("%s    +-- IDENTIFIER: %s\n", newOffset, expr->operands.identifier.value);
+        } else if(expr->type == AST_IFJ_FUNCTION_EXPR) {
+            printf("%s    |\n", newOffset);
+            printf("%s    +-- IFJ FUNCTION (name: %s", newOffset, expr->operands.ifj_function.name);
+        } 
+        else {
                 ast_print_expression(expr->operands.binary_op.left, newOffset);
                 ast_print_expression(expr->operands.binary_op.right, newOffset);
         }

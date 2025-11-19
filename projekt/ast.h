@@ -25,7 +25,8 @@ enum ast_node_type {
     AST_CALL_FUNCTION,
     AST_RETURN,
     AST_GETTER,
-    AST_SETTER
+    AST_SETTER,
+    AST_IFJ_FUNCTION
 };
 
 typedef enum {
@@ -33,6 +34,8 @@ typedef enum {
     AST_NONE,
     AST_NIL,
     AST_VALUE,
+    AST_IDENTIFIER,
+    AST_IFJ_FUNCTION_EXPR,
     AST_FUNCTION_CALL,
     AST_NOT_NULL,
     AST_NOT,
@@ -59,6 +62,11 @@ typedef enum {
     AST_VALUE_STRING
 } ast_value_type;
 
+typedef struct ast_parameter {
+    char *name;
+    struct ast_parameter *next;
+} *ast_parameter;
+
 typedef struct ast_expression {
     ast_expression_type type;
     union {
@@ -84,6 +92,10 @@ typedef struct ast_expression {
             char *name;
             unsigned parameter_count;
         } function_call;
+        struct ast_inf_function {
+            char *name;
+            ast_parameter *params;
+        } ifj_function;
     } operands;
 } *ast_expression;
 
@@ -134,19 +146,21 @@ typedef struct ast_node {
             char *param;
             struct ast_block *body;
         } setter;
+
+        struct ast_ifj_function *ifj_function;
     } data;
 } *ast_node;
-
-typedef struct ast_parameter {
-    char *name;
-    struct ast_parameter *next;
-} *ast_parameter;
 
 typedef struct ast_function {
     char *name;
     struct ast_parameter *parameters;
     struct ast_block *code;
 } *ast_function;
+
+typedef struct ast_ifj_function {
+    char *name;
+    struct ast_parameter *parameters;
+} *ast_ifj_function;
 
 typedef struct ast_fun_call {
     char *name;

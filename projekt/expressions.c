@@ -91,17 +91,27 @@ bool reduce_rule(stack *stack) {
     if(top.symbol == INT || top.symbol == FLOAT || top.symbol == STRING) {
         expr_item item = *(expr_item *)stack_pop(stack);
         item.expr = malloc(sizeof(struct ast_expression));
-        item.expr->type = AST_VALUE;
-        item.expr->operands.identity.value_type = 
-            (item.symbol == INT) ? AST_VALUE_INT :
-            (item.symbol == FLOAT) ? AST_VALUE_FLOAT :
-            AST_VALUE_STRING;
-        if(item.symbol == INT) {
-            item.expr->operands.identity.value.int_value = item.token->value_int;
-        } else if(item.symbol == FLOAT) {
-            item.expr->operands.identity.value.double_value = item.token->value_float;
+
+        if(top.symbol == ID) {
+            if(item.token != NULL) {
+                item.expr->type = AST_IDENTIFIER;
+                item.expr->operands.identifier.value = item.token->value->data;
+            } else {
+                item.expr->type = AST_IFJ_FUNCTION_EXPR;
+            }
         } else {
-            item.expr->operands.identity.value.string_value = item.token->value->data;
+            item.expr->type = AST_VALUE;
+            item.expr->operands.identity.value_type = 
+                (item.symbol == INT) ? AST_VALUE_INT :
+                (item.symbol == FLOAT) ? AST_VALUE_FLOAT :
+                AST_VALUE_STRING;
+            if(item.symbol == INT) {
+                item.expr->operands.identity.value.int_value = item.token->value_int;
+            } else if(item.symbol == FLOAT) {
+                item.expr->operands.identity.value.double_value = item.token->value_float;
+            } else {
+                item.expr->operands.identity.value.string_value = item.token->value->data;
+            }
         }
         item.symbol = EXPR;
 
@@ -278,12 +288,38 @@ int parse_expr(DLListTokens *tokenlist, ast_expression *out_ast){
                 }
             }
 
-            /* push a copy of input */
-            expr_item item;
-            item.symbol = input;
-            item.token = tokenlist->active->token;
-            item.expr = NULL;
-            stack_push_value(&stack, &item, sizeof(item));
+            if(input == ID && strcmp(token->value->data, "Ifj") == 0) {
+                DLLTokens_Next(tokenlist);
+                if(tokenlist->active->token->type != T_DOT) return ERR_SYN;
+                DLLTokens_Next(tokenlist);
+                if(tokenlist->active->token->type != T_IDENT) return ERR_SYN;
+                
+                expr_item item;
+                item.symbol = input;
+                item.token = NULL;
+                item.expr = malloc(sizeof(struct ast_expression));
+                item.expr->type = AST_IFJ_FUNCTION_EXPR;
+                item.expr->operands.ifj_function.name = tokenlist->active->token->value->data;
+                DLLTokens_Next(tokenlist);
+
+                if(tokenlist->active->token->type != T_LPAREN) return ERR_SYN;
+                DLLTokens_Next(tokenlist);
+
+                if(tokenlist->active->token->type == T_RPAREN) {
+                    item.expr->operands.ifj_function.params = NULL;
+                } else {
+                    return 5;
+                }
+                
+                stack_push_value(&stack, &item, sizeof(expr_item));
+            } else {
+                /* push a copy of input */
+                expr_item item;
+                item.symbol = input;
+                item.token = tokenlist->active->token;
+                item.expr = NULL;
+                stack_push_value(&stack, &item, sizeof(expr_item));
+            }
 
             DLLTokens_Next(tokenlist);
             token = tokenlist->active->token;

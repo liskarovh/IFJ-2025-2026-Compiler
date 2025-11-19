@@ -12,13 +12,10 @@ class Program {
             var b 
             b = ((3 - 2))
             a = 2 * (5 + 2 * 3) / 2
-            funcke(a, b)
             {
                 main()
                 //return
             }
-
-            funcke(a, b)
         }
     }
 
@@ -26,6 +23,8 @@ class Program {
         if(a == 5) {
             a = 6
         } else {
+            funkce(a, b)
+            Ifj.write(a, b)
             a = 3
         }
 
@@ -33,11 +32,13 @@ class Program {
             if(b == 0) {
                 break
             } else {
-                
+
             }
             
             b = b + 1
         }
+
+        funkce(a, b)
 
         return a
     }
@@ -48,6 +49,16 @@ class Program {
 
     static value=(v) {
         __val = v
+    }
+
+    static f(a, b) {
+        var a
+        a = 5
+        if(a == "a") {
+
+        } else {
+            a = Ifj.read() + b
+        }
     }
 }
 

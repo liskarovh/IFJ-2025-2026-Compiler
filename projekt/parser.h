@@ -40,7 +40,8 @@ enum grammar_rule {
     GRAMMAR_FUN_CALL,
     GRAMMAR_RETURN,
     GRAMMAR_GETTER,
-    GRAMMAR_SETTER
+    GRAMMAR_SETTER,
+    GRAMMAR_IFJ_CALL
 };
 
 /// @brief Parse the token list and generate the AST

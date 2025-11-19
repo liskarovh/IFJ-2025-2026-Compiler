@@ -16,8 +16,6 @@ class Program {
                 main()
                 return
             }
-
-            funcke(a, b)
         }
     }
 
@@ -25,19 +23,22 @@ class Program {
         if(a == 5) {
             a = 6
         } else {
-            a = 3
+            funkce(a, b)
             Ifj.write(a, b)
+            a = 3
         }
 
         while(b < 2) {
             if(b == 0) {
                 break
             } else {
-                main(a, b)
+
             }
             
             b = b + 1
         }
+
+        funkce(a, b)
 
         return a
     }
@@ -53,11 +54,10 @@ class Program {
     static f(a, b) {
         var a
         a = 5
-        funcke(a, b)
         if(a == "a") {
 
         } else {
-            
+            a = Ifj.read() + b
         }
     }
 }

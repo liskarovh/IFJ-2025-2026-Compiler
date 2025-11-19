@@ -60,6 +60,11 @@ typedef enum {
     AST_VALUE_STRING
 } ast_value_type;
 
+typedef struct ast_parameter {
+    char *name;
+    struct ast_parameter *next;
+} *ast_parameter;
+
 typedef struct ast_expression {
     ast_expression_type type;
     union {
@@ -85,6 +90,10 @@ typedef struct ast_expression {
             char *name;
             unsigned parameter_count;
         } function_call;
+        struct ast_inf_function {
+            char *name;
+            ast_parameter *params;
+        } ifj_function;
     } operands;
 } *ast_expression;
 
@@ -139,11 +148,6 @@ typedef struct ast_node {
         struct ast_ifj_function *ifj_function;
     } data;
 } *ast_node;
-
-typedef struct ast_parameter {
-    char *name;
-    struct ast_parameter *next;
-} *ast_parameter;
 
 typedef struct ast_function {
     char *name;

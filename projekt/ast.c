@@ -581,7 +581,11 @@ void ast_print_expression(ast_expression expr, char *offset) {
         } else if(expr->type == AST_IDENTIFIER) {
             printf("%s    |\n", newOffset);
             printf("%s    +-- IDENTIFIER: %s\n", newOffset, expr->operands.identifier.value);
-        } else {
+        } else if(expr->type == AST_IFJ_FUNCTION_EXPR) {
+            printf("%s    |\n", newOffset);
+            printf("%s    +-- IFJ FUNCTION (name: %s", newOffset, expr->operands.ifj_function.name);
+        } 
+        else {
                 ast_print_expression(expr->operands.binary_op.left, newOffset);
                 ast_print_expression(expr->operands.binary_op.right, newOffset);
         }

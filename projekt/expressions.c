@@ -123,16 +123,25 @@ bool reduce_rule(stack *stack) {
 
         stack_push_value(stack, &item, sizeof(item));
     }
-    else if(top.symbol == ID) {
+    else if (top.symbol == ID) {
         expr_item item = *(expr_item *)stack_pop(stack);
-        item.expr = malloc(sizeof(struct ast_expression));
-        item.expr->type = AST_ID;
-        item.expr->operands.identifier.value = item.token->value->data;
+
+        if (item.expr == NULL) {
+            // === PŘESNĚ TO CO TAM BYLO DOTEĎ ===
+            item.expr = malloc(sizeof(struct ast_expression));
+            if (!item.expr) {
+                return ERR_INTERNAL;
+            }
+            item.expr->type = AST_ID;
+            item.expr->operands.identifier.value = item.token->value->data;
+        }
+        // else: item.expr už existuje
+
         item.symbol = EXPR;
 
         top = *(expr_item *)stack->top->data;
         if(top.symbol == SHIFT_MARK) {
-            expr_item *p = (expr_item *)stack_pop(stack); 
+            expr_item *p = (expr_item *)stack_pop(stack);
             if(p) free(p);
         }
 

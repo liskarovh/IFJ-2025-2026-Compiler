@@ -1436,12 +1436,8 @@ int semantic_pass1(ast tree) {
     }
 
     /* Final dumps */
-    fprintf(stdout, "==== FUNCTABLE AFTER BODIES ====\n");
-    st_dump(cxt.funcs, stdout);
     fprintf(stdout, "==== SYMTAB AFTER BODIES ====\n");
     sem_pretty_print_symtab(&cxt);
-    fprintf(stdout, "==== SCOPES AFTER BODIES ====\n");
-    scopes_dump(&cxt.scopes, stdout);
 
     return SUCCESS;
 }

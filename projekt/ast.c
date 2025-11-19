@@ -241,10 +241,11 @@ void ast_node_dispose(ast_node node) {
         break;
     case AST_FUNCTION: {
         ast_parameter param = node->data.function->parameters;
+        ast_parameter temp;
         while(param != NULL) {
-            ast_parameter to_free = param;
-            param = param->next;
-            free(to_free);
+            temp = param->next;
+            free(param);
+            param = temp;
         }
         ast_block_dispose(node->data.function->code);
         free(node->data.function);
@@ -252,10 +253,11 @@ void ast_node_dispose(ast_node node) {
     }
     case AST_CALL_FUNCTION: {
         ast_parameter param = node->data.function_call->parameters;
+        ast_parameter temp;
         while(param != NULL) {
-            ast_parameter to_free = param;
-            param = param->next;
-            free(to_free);
+            temp = param->next;
+            free(param);
+            param = temp;
         }
         free(node->data.function_call);
         break;
@@ -577,6 +579,11 @@ void ast_print_expression(ast_expression expr, char *offset) {
             } else {
                 printf("UNKNOWN TYPE\n");
             }
+
+        } else if(expr->type == AST_ID) {
+            printf("%s    |\n", newOffset);
+            printf("%s    +-- VALUE: ", newOffset);
+            printf("%s\n", expr->operands.identifier.value);
             
         } else if(expr->type == AST_IDENTIFIER) {
             printf("%s    |\n", newOffset);

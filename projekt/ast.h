@@ -30,6 +30,7 @@ enum ast_node_type {
 };
 
 typedef enum {
+    AST_ID,
     AST_NONE,
     AST_NIL,
     AST_VALUE,
@@ -51,7 +52,8 @@ typedef enum {
     AST_TERNARY,
     AST_AND,
     AST_OR,
-    AST_IS
+    AST_IS,
+    AST_CONCAT
 } ast_expression_type;
 
 typedef enum {

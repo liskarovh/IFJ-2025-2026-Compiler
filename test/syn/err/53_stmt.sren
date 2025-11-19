@@ -1,0 +1,11 @@
+import "ifj25" for Ifj
+class Program {
+  static main() {
+    _if(8 < 5) {
+
+    }
+    else {
+        
+    }
+  }
+}

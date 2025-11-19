@@ -14,7 +14,7 @@ class Program {
             a = 2 * (5 + 2 * 3) / 2
             {
                 main()
-                return
+                //return
             }
         }
     }

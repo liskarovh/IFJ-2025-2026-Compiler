@@ -357,6 +357,7 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
 
         if(current_class->current->current != NULL) {
             if(current_class->current->current->type == AST_FUNCTION) {
+                if (token_type != T_IDENT) return ERR_SEM;
                 ast_function current_function = current_class->current->current->data.function;
                 if(current_function->parameters == NULL) {
                     current_function->parameters = malloc(sizeof(struct ast_parameter));
@@ -391,7 +392,7 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
                 if(current_ifj_function->parameters == NULL) {
                     current_ifj_function->parameters = malloc(sizeof(struct ast_parameter));
                     current_ifj_function->parameters->name = tokenList->active->token->value->data;
-                    current_ifj_function->parameters->next = NULL;
+                        current_ifj_function->parameters->next = NULL;
                 } else {
                     ast_parameter param_iter = current_ifj_function->parameters;
                     while(param_iter->next != NULL) {

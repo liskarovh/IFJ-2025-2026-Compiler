@@ -569,25 +569,25 @@ void generate_expression(generator gen, char * result, ast_expression node){
 }
 
 void generate_ifjfunction(generator gen, char* name, ast_parameter params, char* output){ 
-    if(strcmp(name, "str"))
+    if(strcmp(name, "str") == 0)
         ifj_float2char(gen, output, params->name);
     //else if(strcmp(name, "chr"))
-    else if(strcmp(name, "floor"))
+    else if(strcmp(name, "floor") == 0)
         ifj_float2int(gen, output, params->name);
-    else if(strcmp(name, "length"))
+    else if(strcmp(name, "length") == 0)
         ifj_strlen(gen, output, params->name);
-    else if(strcmp(name, "ord")){
+    else if(strcmp(name, "ord") == 0){
         ifj_getchar(gen, "GF@tmp_ifj", params->name, params->next->name);
         ifj_stri2int(gen, output, "GF@tmp_ifj");
     }
-    else if(strcmp(name, "read_num"))
+    else if(strcmp(name, "read_num") == 0)
         ifj_read(gen, output, "float");
-    else if(strcmp(name, "read_str"))
+    else if(strcmp(name, "read_str") == 0)
         ifj_read(gen, output, "string");
-    else if(strcmp(name, "strcmp"))
+    else if(strcmp(name, "strcmp") == 0)
         op_eq(gen, output, params->name, params->next->name);
     //else if(strcmp(name, "substring"))
-    else if(strcmp(name, "write"))
+    else if(strcmp(name, "write") == 0)
         ifj_write(gen, params->name);
 }
 
@@ -724,9 +724,9 @@ void generate_node(ast_node node, generator gen){
             generate_assignment(gen, node);
             break;
 
-        //case AST_IFJ_FUNCTION: //read / write
-            //generate_ifjfunction(gen, node, NULL);
-            //break;
+        case AST_IFJ_FUNCTION: //read / write
+            generate_ifjfunction(gen, node->data.ifj_function->name, node->data.ifj_function->parameters, NULL);
+            break;
 
         case AST_WHILE_LOOP:
             generate_while(gen, node);

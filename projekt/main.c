@@ -53,7 +53,7 @@ int main() {
     init_code(gen, ast_tree);
     generate_code(gen, ast_tree);
     fputs(gen->output->data, stdout);
-    
+
 
     free(gen);
     ast_dispose(ast_tree);

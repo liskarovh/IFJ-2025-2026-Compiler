@@ -56,3 +56,4 @@ dkms.conf
 
 # build
 build/
+test/ifj2025codes_zadani/test.wren

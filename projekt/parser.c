@@ -350,7 +350,8 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
             break;
         }
 
-        if(tokenList->active->token->type != T_IDENT) {
+        int token_type = tokenList->active->token->type;
+        if(token_type != T_IDENT && token_type != T_STRING && token_type != T_ML_STRING && token_type != T_FLOAT && token_type != T_INT && token_type != T_BOOL_FALSE && token_type != T_BOOL_TRUE) {
             return ERR_SYN;
         }
 
@@ -644,7 +645,7 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
             return ERR_SYN;
         }
         DLLTokens_Next(tokenList);
-        
+
         if(tokenList->active->token->type != T_DOT) {
             return ERR_SYN;
         }

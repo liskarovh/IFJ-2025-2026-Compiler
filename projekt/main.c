@@ -19,22 +19,14 @@
 
 
 int main() {
-    FILE *source = fopen("../test/ifj2025codes_zadani/test.wren", "r");
-    if (source == NULL) {
-        fprintf(stderr, "Error opening source file.\n");
-        return ERR_INTERNAL;
-
-    }
 
     DLListTokens token_list;
     DLLTokens_Init(&token_list);
 
-    int result = scanner(source, &token_list);
+    int result = scanner(stdin, &token_list);
 
     if (result != SUCCESS) {
         DLLTokens_Dispose(&token_list);
-        fclose(source);
-        
         return result;
     }
     DLLTokens_First(&token_list);
@@ -46,7 +38,6 @@ int main() {
     if (result != SUCCESS) {
         ast_dispose(ast_tree);
         DLLTokens_Dispose(&token_list);
-        fclose(source);
         return result;
     }
 
@@ -56,12 +47,10 @@ int main() {
     if (result != SUCCESS) {
         ast_dispose(ast_tree);
         DLLTokens_Dispose(&token_list);
-        fclose(source);
         return result;
     }
     ast_dispose(ast_tree);
     DLLTokens_Dispose(&token_list);
-    fclose(source);
 
     return result;
 }

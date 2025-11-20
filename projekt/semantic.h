@@ -80,7 +80,7 @@ typedef struct semantic_ctx {
     sem_scope_id_stack ids;     /**< stack of textual scope IDs ("1", "1.1", ...) */
     int                loop_depth; /**< nesting counter for loop checks */
     bool               seen_main;  /**< true if main() with 0 params was found */
-} semantic_ctx;
+} semantic;
 
 /**
  * @brief Run the first semantic pass over the AST.

@@ -52,6 +52,8 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
         out_ast->import = ast_import_init();
 
         DLLTokens_Next(tokenList);
+        if (tokenList->active->token->type == T_EOL)
+            return ERR_SYN;
 
         int err = parser(tokenList, out_ast, GRAMMAR_IMPORT_IFJ25);
         if (err != SUCCESS) {
@@ -343,6 +345,10 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
             return ERR_SYN;
         }
         DLLTokens_Next(tokenList);
+        if(current_class->current->current->type == AST_CALL_FUNCTION || current_class->current->current->type == AST_IFJ_FUNCTION) {
+            if (tokenList->active->token->type != T_EOL)
+                return ERR_SYN;
+        }
         break;
     }
     case GRAMMAR_PARAM_LIST: {

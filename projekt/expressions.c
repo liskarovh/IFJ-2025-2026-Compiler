@@ -122,6 +122,7 @@ bool reduce_rule(stack *stack) {
         }
 
         stack_push_value(stack, &item, sizeof(item));
+        return true;
     }
     else if(top.symbol == ID) {
         expr_item item = *(expr_item *)stack_pop(stack);
@@ -137,6 +138,7 @@ bool reduce_rule(stack *stack) {
         }
 
         stack_push_value(stack, &item, sizeof(item));
+        return true;
     }
     else if(stack->top != NULL && stack->top->next != NULL && stack->top->next->next != NULL) {
         expr_item middle = *(expr_item *)stack->top->next->data;
@@ -188,7 +190,7 @@ bool reduce_rule(stack *stack) {
                     }
 
                     stack_push_value(stack, &newExpr, sizeof(newExpr));
-                    break;
+                    return true;
                 }
                 default:
                     return false;
@@ -209,10 +211,11 @@ bool reduce_rule(stack *stack) {
             }
 
             stack_push_value(stack, expr, sizeof(expr_item));
+            return true;
         }
     }
 
-    return true;
+    return false;
 }
 
 void push_shift(stack *s) {

@@ -19,15 +19,10 @@
 
 
 int main() {
-    FILE *source = fopen("../test/ifj2025codes_zadani/test.wren", "r");
-    if (source == NULL) {
-        return ERR_INTERNAL;
-    }
-
     DLListTokens token_list;
     DLLTokens_Init(&token_list);
 
-    int result = scanner(source, &token_list);
+    int result = scanner(stdin, &token_list);
 
     generator gen = malloc(sizeof(generator));
     if(gen == NULL)
@@ -36,7 +31,6 @@ int main() {
 
     if (result != SUCCESS) {
         DLLTokens_Dispose(&token_list);
-        fclose(source);
         
         return result;
     }
@@ -46,19 +40,14 @@ int main() {
     ast_init(&ast_tree);
 
     result = parser(&token_list, ast_tree, GRAMMAR_PROGRAM);
-
-    ast_print(ast_tree);
-
+    if (result != SUCCESS) return result;
 
     init_code(gen, ast_tree);
     generate_code(gen, ast_tree);
     fputs(gen->output->data, stdout);
-
+    
 
     free(gen);
     ast_dispose(ast_tree);
     DLLTokens_Dispose(&token_list);
-    fclose(source);
-
-    return result;
 }

@@ -547,6 +547,10 @@ char *get_operator_symbol(ast_expression_type type) {
         return "VALUE";
     case AST_IDENTIFIER:
         return "ID";
+    case AST_IFJ_FUNCTION_EXPR:
+        return "IFJ Function";
+    case AST_FUNCTION_CALL:
+        return "FUNCTION CALL";
     default:
         return "UNKNOWN";
     }
@@ -576,6 +580,8 @@ void ast_print_expression(ast_expression expr, char *offset) {
                 printf("%f\n", expr->operands.identity.value.double_value);
             } else if(expr->operands.identity.value_type == AST_VALUE_STRING) {
                 printf("%s\n", expr->operands.identity.value.string_value);
+            } else if (expr->operands.identity.value_type == AST_VALUE_NULL) {
+                printf("%s\n", "NULL");
             } else {
                 printf("UNKNOWN TYPE\n");
             }
@@ -590,7 +596,34 @@ void ast_print_expression(ast_expression expr, char *offset) {
             printf("%s    +-- IDENTIFIER: %s\n", newOffset, expr->operands.identifier.value);
         } else if(expr->type == AST_IFJ_FUNCTION_EXPR) {
             printf("%s    |\n", newOffset);
-            printf("%s    +-- IFJ FUNCTION (name: %s", newOffset, expr->operands.ifj_function.name);
+            printf("%s    +-- IFJ FUNCTION (name: %s", newOffset, expr->operands.ifj_function->name);
+            if(expr->operands.ifj_function->parameters != NULL) {
+                printf(", parameters: ");
+                ast_parameter parameter = expr->operands.ifj_function->parameters;
+                while(parameter != NULL) {
+                    printf("%s", parameter->name);
+                    parameter = parameter->next;
+                    if(parameter != NULL) {
+                        printf(", ");
+                    }
+                }
+            }
+        printf(")\n");
+        } else if(expr->type == AST_FUNCTION_CALL) {
+            printf("%s    |\n", newOffset);
+            printf("%s    +-- FUNCTION CALL (name: %s", newOffset, expr->operands.function_call->name);
+            if(expr->operands.function_call->parameters != NULL) {
+                printf(", parameters: ");
+                ast_parameter parameter = expr->operands.function_call->parameters;
+                while(parameter != NULL) {
+                    printf("%s", parameter->name);
+                    parameter = parameter->next;
+                    if(parameter != NULL) {
+                        printf(", ");
+                    }
+                }
+            }
+        printf(")\n");
         } 
         else {
                 ast_print_expression(expr->operands.binary_op.left, newOffset);

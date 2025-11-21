@@ -431,9 +431,27 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
             return ERR_SYN;
         }
         ast_add_new_node(&current_class, AST_VAR_DECLARATION);
-        current_class->current->current->data.declaration.name = tokenList->active->token->value->data;
+        char *var_name = tokenList->active->token->value->data;
+        current_class->current->current->data.declaration.name = var_name;
         DLLTokens_Next(tokenList);
-        if(tokenList->active->token->type != T_EOL) {
+
+        if (tokenList->active->token->type == T_ASSIGN) {
+            ast_add_new_node(&current_class, AST_ASSIGNMENT); 
+        
+            // 4. Nastavit název u přiřazení pomocí uložené proměnné 'var_name'
+            current_class->current->current->data.assignment.name = var_name; // Použijeme var_name
+            
+            DLLTokens_Next(tokenList);
+            
+            // Zbytek logiky pro výraz
+            ast_expression current_expression; 
+            int err = parse_expr(tokenList, &current_expression);
+            if (err != SUCCESS) {
+                return err;
+            }
+            current_class->current->current->data.assignment.value = current_expression;
+        }
+        else if (tokenList->active->token->type != T_EOL) {
             return ERR_SYN;
         }
         break;
@@ -528,7 +546,7 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
         }
 
         if(tokenList->active->token->type != T_KW_ELSE) {
-            return ERR_SYN;
+            return SUCCESS;
         }
         DLLTokens_Next(tokenList);
 

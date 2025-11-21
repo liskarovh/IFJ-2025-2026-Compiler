@@ -42,12 +42,14 @@ int main() {
     result = parser(&token_list, ast_tree, GRAMMAR_PROGRAM);
     if (result != SUCCESS) return result;
 
-    init_code(gen, ast_tree);
-    generate_code(gen, ast_tree);
-    fputs(gen->output->data, stdout);
+    ast_print(ast_tree);
+    
+    //init_code(gen, ast_tree);
+    //generate_code(gen, ast_tree);
+    //fputs(gen->output->data, stdout);
     
 
     free(gen);
-    ast_dispose(ast_tree);
+    //ast_dispose(ast_tree);
     DLLTokens_Dispose(&token_list);
 }

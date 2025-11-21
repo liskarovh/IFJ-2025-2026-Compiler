@@ -28,6 +28,7 @@ void init_code(generator gen, ast syntree);
 void generate_code(generator gen, ast syntree);
 void generate_function(generator gen, ast_node node);
 void generate_block(generator gen, ast_block block);
+void generate_ifjfunction(generator gen, char* name, ast_parameter params, char* output);
 
 
 const char *PREFIXES[] = {
@@ -155,6 +156,11 @@ char *ast_value_to_string(ast_expression node) {
         
         case AST_VALUE_STRING: {
             result = escape_string_literal(node->operands.identity.value.string_value);
+            break;
+        }
+        case AST_VALUE_NULL: {
+            result = malloc((8) * sizeof(char));
+            result = "nil@nil";
             break;
         }
         
@@ -552,8 +558,8 @@ void generate_expression(generator gen, char * result, ast_expression node){
     else if(node->type == AST_ID){ //not expression
         move_var(gen, result, node->operands.identifier.value); //move LF@var value
     }
-    //else if(node->type == AST_IFJ_FUNCTION_EXPR)
-    //    generate_ifjfunction(gen, result, node->operands.ast_ifj_function->parameters, node->operands.ast_ifj_function->name);
+    else if(node->type == AST_IFJ_FUNCTION_EXPR)
+        generate_ifjfunction(gen, node->operands.ifj_function->name, node->operands.ifj_function->parameters, result);
     else {
         switch(get_op_arity(node->type)){
                 case ARITY_UNARY:

@@ -31,7 +31,8 @@ typedef enum {
     ID,
     SHIFT_MARK,
     EXPR,
-    DOLLAR
+    DOLLAR,
+    NULL_VAR
 } prec_table_enum;
 
 typedef enum {

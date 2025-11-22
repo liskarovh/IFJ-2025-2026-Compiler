@@ -42,6 +42,7 @@ prec_table_index get_prec_index(prec_table_enum symbol){
         case INT:
         case FLOAT:
         case STRING:
+        case NULL_VAR:
             return I_DATA;
         case RIGHT_PAREN:
             return I_RIGHT_BRAC;
@@ -69,11 +70,13 @@ prec_table_enum token_to_expr(tokenPtr token) {
         case T_LPAREN: return LEFT_PAREN;
         case T_RPAREN: return RIGHT_PAREN;
         
+        case T_KW_NULL: return NULL_VAR;
         case T_INT: return INT;
         case T_FLOAT: return FLOAT;
         case T_STRING: return STRING;
         case T_IDENT: return ID;
         case T_GLOB_IDENT: return ID;
+        case T_KW_NUM: return ID;
         case T_KW_IS: return IS;
         
 
@@ -88,29 +91,36 @@ bool reduce_rule(stack *stack) {
     }
 
     expr_item top = *(expr_item *)stack->top->data;
-    if(top.symbol == INT || top.symbol == FLOAT || top.symbol == STRING) {
+    if(top.symbol == INT || top.symbol == FLOAT || top.symbol == STRING || top.symbol == ID || top.symbol == NULL_VAR) {
         expr_item item = *(expr_item *)stack_pop(stack);
-        item.expr = malloc(sizeof(struct ast_expression));
 
-        if(top.symbol == ID) {
-            if(item.token != NULL) {
-                item.expr->type = AST_IDENTIFIER;
-                item.expr->operands.identifier.value = item.token->value->data;
-            } else {
-                item.expr->type = AST_IFJ_FUNCTION_EXPR;
+        if (item.expr == NULL) { 
+            item.expr = malloc(sizeof(struct ast_expression));
+            if(item.expr == NULL) {
+                return false; 
             }
-        } else {
-            item.expr->type = AST_VALUE;
-            item.expr->operands.identity.value_type = 
-                (item.symbol == INT) ? AST_VALUE_INT :
-                (item.symbol == FLOAT) ? AST_VALUE_FLOAT :
-                AST_VALUE_STRING;
-            if(item.symbol == INT) {
-                item.expr->operands.identity.value.int_value = item.token->value_int;
-            } else if(item.symbol == FLOAT) {
-                item.expr->operands.identity.value.double_value = item.token->value_float;
+
+            if(top.symbol == ID) {
+                if(item.token != NULL) {
+                    item.expr->type = AST_IDENTIFIER;
+                    item.expr->operands.identifier.value = item.token->value->data;
+                } else {
+                    item.expr->type = AST_IFJ_FUNCTION_EXPR;
+                }
             } else {
-                item.expr->operands.identity.value.string_value = item.token->value->data;
+                item.expr->type = AST_VALUE;
+                item.expr->operands.identity.value_type = 
+                    (item.symbol == INT) ? AST_VALUE_INT :
+                    (item.symbol == FLOAT) ? AST_VALUE_FLOAT :
+                    (item.symbol == STRING) ? AST_VALUE_STRING:
+                    AST_VALUE_NULL;
+                if(item.symbol == INT) {
+                    item.expr->operands.identity.value.int_value = item.token->value_int;
+                } else if(item.symbol == FLOAT) {
+                    item.expr->operands.identity.value.double_value = item.token->value_float;
+                } else {
+                    item.expr->operands.identity.value.string_value = item.token->value->data;
+                }
             }
         }
         item.symbol = EXPR;
@@ -122,6 +132,7 @@ bool reduce_rule(stack *stack) {
         }
 
         stack_push_value(stack, &item, sizeof(item));
+        return true;
     }
     else if (top.symbol == ID) {
         expr_item item = *(expr_item *)stack_pop(stack);
@@ -146,6 +157,7 @@ bool reduce_rule(stack *stack) {
         }
 
         stack_push_value(stack, &item, sizeof(item));
+        return true;
     }
     else if(stack->top != NULL && stack->top->next != NULL && stack->top->next->next != NULL) {
         expr_item middle = *(expr_item *)stack->top->next->data;
@@ -197,7 +209,7 @@ bool reduce_rule(stack *stack) {
                     }
 
                     stack_push_value(stack, &newExpr, sizeof(newExpr));
-                    break;
+                    return true;
                 }
                 default:
                     return false;
@@ -218,10 +230,11 @@ bool reduce_rule(stack *stack) {
             }
 
             stack_push_value(stack, expr, sizeof(expr_item));
+            return true;
         }
     }
 
-    return true;
+    return false;
 }
 
 void push_shift(stack *s) {
@@ -296,8 +309,78 @@ int parse_expr(DLListTokens *tokenlist, ast_expression *out_ast){
                     break;
                 }
             }
+            if (input == ID && tokenlist->active->next != NULL && tokenlist->active->next->token->type == T_LPAREN) {
+                expr_item item;
+                item.symbol = input;
+                item.token = NULL;
+                item.expr = malloc(sizeof(struct ast_expression));
+                if (item.expr == NULL) return ERR_INTERNAL;
+                item.expr->type = AST_FUNCTION_CALL;
+                item.expr->operands.function_call = malloc(sizeof(struct ast_fun_call));
+                item.expr->operands.function_call->name = tokenlist->active->token->value->data;
+                DLLTokens_Next(tokenlist);
+                
+                if(tokenlist->active->token->type != T_LPAREN) {
+                    return ERR_SYN;
+                }
+                DLLTokens_Next(tokenlist);
+                
 
-            if(input == ID && strcmp(token->value->data, "Ifj") == 0) {
+                item.expr->operands.function_call->parameters = NULL;
+                struct ast_parameter *last_param = NULL;
+
+                while (tokenlist->active->token->type != T_RPAREN) {
+                    int type = tokenlist->active->token->type;
+                    if(type != T_IDENT && type != T_STRING && type != T_ML_STRING && 
+                        type != T_FLOAT && type != T_INT && 
+                        type != T_BOOL_FALSE && type != T_BOOL_TRUE &&
+                        type != T_GLOB_IDENT) {
+                        return ERR_SYN;
+                    }
+
+                    struct ast_parameter *new_param = malloc(sizeof(struct ast_parameter));
+                    if (new_param == NULL) {
+                        return ERR_INTERNAL;
+                    }
+                    
+                    if(tokenlist->active->token->type == T_FLOAT) {
+                        new_param->value_type = AST_VALUE_FLOAT;
+                        new_param->value.double_value = tokenlist->active->token->value_float;
+                    } else if (tokenlist->active->token->type == T_INT) {
+                        new_param->value_type = AST_VALUE_INT;
+                        new_param->value.int_value = tokenlist->active->token->value_int;
+                    } else if (tokenlist->active->token->type == T_KW_NULL)
+                        new_param->value_type = AST_VALUE_NULL;
+                    else {
+                        if (tokenlist->active->token->type == T_IDENT)
+                            new_param->value_type = AST_VALUE_IDENTIFIER;
+                        else new_param->value_type = AST_VALUE_STRING;
+                        new_param->value.string_value = tokenlist->active->token->value->data;
+                    }
+
+                    new_param->next = NULL;
+
+                    if (item.expr->operands.function_call->parameters == NULL) {
+                        item.expr->operands.function_call->parameters = new_param;
+                    } else {
+                        last_param->next = new_param;
+                    }
+                    last_param = new_param;
+
+                    DLLTokens_Next(tokenlist);
+
+                    if (tokenlist->active->token->type == T_COMMA) {
+                        DLLTokens_Next(tokenlist);
+                        if (tokenlist->active->token->type == T_RPAREN) {
+                            return ERR_SYN;
+                        }
+                    } else if (tokenlist->active->token->type != T_RPAREN) {
+                        return ERR_SYN;
+                    }
+                }
+
+                stack_push_value(&stack, &item, sizeof(expr_item));
+            } else if(input == ID && strcmp(token->value->data, "Ifj") == 0) {
                 DLLTokens_Next(tokenlist);
                 if(tokenlist->active->token->type != T_DOT) return ERR_SYN;
                 DLLTokens_Next(tokenlist);
@@ -307,17 +390,70 @@ int parse_expr(DLListTokens *tokenlist, ast_expression *out_ast){
                 item.symbol = input;
                 item.token = NULL;
                 item.expr = malloc(sizeof(struct ast_expression));
+                if (item.expr == NULL) return ERR_INTERNAL;
                 item.expr->type = AST_IFJ_FUNCTION_EXPR;
-                item.expr->operands.ifj_function.name = tokenlist->active->token->value->data;
+                item.expr->operands.ifj_function = malloc(sizeof(struct ast_ifj_function));
+                if (item.expr->operands.ifj_function == NULL) {
+                    return ERR_INTERNAL;
+                }
+                item.expr->operands.ifj_function->name = tokenlist->active->token->value->data;
                 DLLTokens_Next(tokenlist);
-
-                if(tokenlist->active->token->type != T_LPAREN) return ERR_SYN;
+                
+                if(tokenlist->active->token->type != T_LPAREN) {
+                    return ERR_SYN;
+                }
                 DLLTokens_Next(tokenlist);
+                
 
-                if(tokenlist->active->token->type == T_RPAREN) {
-                    item.expr->operands.ifj_function.params = NULL;
-                } else {
-                    return 5;
+                item.expr->operands.ifj_function->parameters = NULL;
+                struct ast_parameter *last_param = NULL;
+
+                while (tokenlist->active->token->type != T_RPAREN) {
+                    int type = tokenlist->active->token->type;
+                    if(type != T_IDENT && type != T_STRING && type != T_ML_STRING && 
+                        type != T_FLOAT && type != T_INT && 
+                        type != T_BOOL_FALSE && type != T_BOOL_TRUE &&
+                        type != T_GLOB_IDENT && type != T_KW_NULL) {
+                        return ERR_SYN;
+                    }
+
+                    struct ast_parameter *new_param = malloc(sizeof(struct ast_parameter));
+                    if (new_param == NULL) {
+                        return ERR_INTERNAL;
+                    }
+                    if(tokenlist->active->token->type == T_FLOAT) {
+                        new_param->value_type = AST_VALUE_FLOAT;
+                        new_param->value.double_value = tokenlist->active->token->value_float;
+                    } else if (tokenlist->active->token->type == T_INT) {
+                        new_param->value_type = AST_VALUE_INT;
+                        new_param->value.int_value = tokenlist->active->token->value_int;
+                    } else if (tokenlist->active->token->type == T_KW_NULL)
+                        new_param->value_type = AST_VALUE_NULL;
+                    else {
+                        if (tokenlist->active->token->type == T_IDENT)
+                            new_param->value_type = AST_VALUE_IDENTIFIER;
+                        else new_param->value_type = AST_VALUE_STRING;
+                        new_param->value.string_value = tokenlist->active->token->value->data;
+                    }
+                    new_param->next = NULL;
+
+                    if (item.expr->operands.ifj_function->parameters == NULL) {
+                        item.expr->operands.ifj_function->parameters = new_param;
+                    } else {
+                        last_param->next = new_param;
+                    }
+                    last_param = new_param;
+
+                    DLLTokens_Next(tokenlist);
+
+                    if (tokenlist->active->token->type == T_COMMA) {
+                        DLLTokens_Next(tokenlist);
+                        if (tokenlist->active->token->type == T_RPAREN) {
+                            return ERR_SYN;
+                        }
+                    } else if (tokenlist->active->token->type != T_RPAREN) {
+                        return ERR_SYN;
+                    }
                 }
                 
                 stack_push_value(&stack, &item, sizeof(expr_item));

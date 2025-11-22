@@ -59,11 +59,18 @@ typedef enum {
 typedef enum {
     AST_VALUE_INT,
     AST_VALUE_FLOAT,
-    AST_VALUE_STRING
+    AST_VALUE_STRING,
+    AST_VALUE_NULL,
+    AST_VALUE_IDENTIFIER
 } ast_value_type;
 
 typedef struct ast_parameter {
-    char *name;
+    ast_value_type value_type;
+    union {
+        int int_value;
+        double double_value;
+        char *string_value;
+    } value;
     struct ast_parameter *next;
 } *ast_parameter;
 
@@ -88,14 +95,8 @@ typedef struct ast_expression {
         struct ast_identifier {
             char *value;
         } identifier;
-        struct ast_function_call {
-            char *name;
-            unsigned parameter_count;
-        } function_call;
-        struct ast_inf_function {
-            char *name;
-            ast_parameter *params;
-        } ifj_function;
+        struct ast_fun_call *function_call;
+        struct ast_ifj_function *ifj_function;
     } operands;
 } *ast_expression;
 
@@ -161,6 +162,7 @@ typedef struct ast_ifj_function {
     char *name;
     struct ast_parameter *parameters;
 } *ast_ifj_function;
+
 
 typedef struct ast_fun_call {
     char *name;

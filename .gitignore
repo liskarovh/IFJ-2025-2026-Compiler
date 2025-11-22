@@ -56,3 +56,6 @@ dkms.conf
 
 # build
 build/
+projekt/run_stx_tests.sh
+tests/
+test/python/__pycache__

@@ -362,7 +362,8 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
         if(token_type != T_IDENT && token_type != T_STRING &&
             token_type != T_ML_STRING && token_type != T_FLOAT &&
             token_type != T_INT && token_type != T_BOOL_FALSE &&
-            token_type != T_BOOL_TRUE && token_type != T_GLOB_IDENT) {
+            token_type != T_BOOL_TRUE && token_type != T_GLOB_IDENT &&
+            token_type != T_KW_NULL) {
             return ERR_SYN;
         }
 
@@ -378,8 +379,12 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
                     } else if (tokenList->active->token->type == T_INT) {
                         current_function->parameters->value_type = AST_VALUE_INT;
                         current_function->parameters->value.int_value = tokenList->active->token->value_int;
-                    } else {
-                        current_function->parameters->value_type = AST_VALUE_STRING;
+                    } else if (tokenList->active->token->type == T_KW_NULL)
+                        current_function->parameters->value_type = AST_VALUE_NULL;
+                    else {
+                        if (tokenList->active->token->type == T_IDENT)
+                            current_function->parameters->value_type = AST_VALUE_IDENTIFIER;
+                        else current_function->parameters->value_type = AST_VALUE_STRING;
                         current_function->parameters->value.string_value = tokenList->active->token->value->data;
                     }
                     current_function->parameters->next = NULL;
@@ -395,8 +400,12 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
                     } else if (tokenList->active->token->type == T_INT) {
                         param_iter->next->value_type = AST_VALUE_INT;
                         param_iter->next->value.int_value = tokenList->active->token->value_int;
-                    } else {
-                        param_iter->next->value_type = AST_VALUE_STRING;
+                    } else if (tokenList->active->token->type == T_KW_NULL)
+                            param_iter->next->value_type = AST_VALUE_NULL;
+                    else {
+                        if (tokenList->active->token->type == T_IDENT)
+                            param_iter->next->value_type = AST_VALUE_IDENTIFIER;
+                        else param_iter->next->value_type = AST_VALUE_STRING;
                         param_iter->next->value.string_value = tokenList->active->token->value->data;
                     }
                     param_iter->next->next = NULL;
@@ -411,8 +420,12 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
                     } else if (tokenList->active->token->type == T_INT) {
                         current_fun_call->parameters->value_type = AST_VALUE_INT;
                         current_fun_call->parameters->value.int_value = tokenList->active->token->value_int;
-                    } else {
-                        current_fun_call->parameters->value_type = AST_VALUE_STRING;
+                    } else if (tokenList->active->token->type == T_KW_NULL)
+                        current_fun_call->parameters->value_type = AST_VALUE_NULL;
+                    else {
+                        if (tokenList->active->token->type == T_IDENT)
+                            current_fun_call->parameters->value_type = AST_VALUE_IDENTIFIER;
+                        else current_fun_call->parameters->value_type = AST_VALUE_STRING;
                         current_fun_call->parameters->value.string_value = tokenList->active->token->value->data;
                     }
                     current_fun_call->parameters->next = NULL;
@@ -428,8 +441,12 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
                     } else if (tokenList->active->token->type == T_INT) {
                         param_iter->next->value_type = AST_VALUE_INT;
                         param_iter->next->value.int_value = tokenList->active->token->value_int;
-                    } else {
-                        param_iter->next->value_type = AST_VALUE_STRING;
+                    } else if (tokenList->active->token->type == T_KW_NULL)
+                        param_iter->next->value_type = AST_VALUE_NULL;
+                    else {
+                        if (tokenList->active->token->type == T_IDENT)
+                            param_iter->next->value_type = AST_VALUE_IDENTIFIER;
+                        else param_iter->next->value_type = AST_VALUE_STRING;
                         param_iter->next->value.string_value = tokenList->active->token->value->data;
                     }
                     param_iter->next->next = NULL;
@@ -444,8 +461,12 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
                     } else if (tokenList->active->token->type == T_INT) {
                         current_ifj_function->parameters->value_type = AST_VALUE_INT;
                         current_ifj_function->parameters->value.int_value = tokenList->active->token->value_int;
-                    } else {
-                        current_ifj_function->parameters->value_type = AST_VALUE_STRING;
+                    } else if (tokenList->active->token->type == T_KW_NULL)
+                        current_ifj_function->parameters->value_type = AST_VALUE_NULL;
+                    else {
+                        if (tokenList->active->token->type == T_IDENT)
+                            current_ifj_function->parameters->value_type = AST_VALUE_IDENTIFIER;
+                        else current_ifj_function->parameters->value_type = AST_VALUE_STRING;
                         current_ifj_function->parameters->value.string_value = tokenList->active->token->value->data;
                     }
                     current_ifj_function->parameters->next = NULL;
@@ -461,8 +482,12 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
                     } else if (tokenList->active->token->type == T_INT) {
                         param_iter->next->value_type = AST_VALUE_INT;
                         param_iter->next->value.int_value = tokenList->active->token->value_int;
-                    } else {
-                        param_iter->next->value_type = AST_VALUE_STRING;
+                    } else if (tokenList->active->token->type == T_KW_NULL)
+                        param_iter->next->value_type = AST_VALUE_NULL;
+                    else {
+                        if (tokenList->active->token->type == T_IDENT)
+                            param_iter->next->value_type = AST_VALUE_IDENTIFIER;
+                        else param_iter->next->value_type = AST_VALUE_STRING;
                         param_iter->next->value.string_value = tokenList->active->token->value->data;
                     }
                     param_iter->next->next = NULL;

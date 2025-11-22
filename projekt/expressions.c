@@ -349,8 +349,12 @@ int parse_expr(DLListTokens *tokenlist, ast_expression *out_ast){
                     } else if (tokenlist->active->token->type == T_INT) {
                         new_param->value_type = AST_VALUE_INT;
                         new_param->value.int_value = tokenlist->active->token->value_int;
-                    } else {
-                        new_param->value_type = AST_VALUE_STRING;
+                    } else if (tokenlist->active->token->type == T_KW_NULL)
+                        new_param->value_type = AST_VALUE_NULL;
+                    else {
+                        if (tokenlist->active->token->type == T_IDENT)
+                            new_param->value_type = AST_VALUE_IDENTIFIER;
+                        else new_param->value_type = AST_VALUE_STRING;
                         new_param->value.string_value = tokenlist->active->token->value->data;
                     }
 
@@ -409,7 +413,7 @@ int parse_expr(DLListTokens *tokenlist, ast_expression *out_ast){
                     if(type != T_IDENT && type != T_STRING && type != T_ML_STRING && 
                         type != T_FLOAT && type != T_INT && 
                         type != T_BOOL_FALSE && type != T_BOOL_TRUE &&
-                        type != T_GLOB_IDENT) {
+                        type != T_GLOB_IDENT && type != T_KW_NULL) {
                         return ERR_SYN;
                     }
 
@@ -423,8 +427,12 @@ int parse_expr(DLListTokens *tokenlist, ast_expression *out_ast){
                     } else if (tokenlist->active->token->type == T_INT) {
                         new_param->value_type = AST_VALUE_INT;
                         new_param->value.int_value = tokenlist->active->token->value_int;
-                    } else {
-                        new_param->value_type = AST_VALUE_STRING;
+                    } else if (tokenlist->active->token->type == T_KW_NULL)
+                        new_param->value_type = AST_VALUE_NULL;
+                    else {
+                        if (tokenlist->active->token->type == T_IDENT)
+                            new_param->value_type = AST_VALUE_IDENTIFIER;
+                        else new_param->value_type = AST_VALUE_STRING;
                         new_param->value.string_value = tokenlist->active->token->value->data;
                     }
                     new_param->next = NULL;

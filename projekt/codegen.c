@@ -37,6 +37,7 @@ const char *PREFIXES[] = {
     "string@",
     "GF@",
     "LF@",
+    "nil@",
     NULL // Ukončovací prvek pole
 };
 
@@ -134,40 +135,75 @@ char* escape_string_literal(const char* original_str) {
     return result;
 }
 
-char *ast_value_to_string(ast_expression node) {
+char *ast_value_to_string(ast_expression expr_node, ast_parameter param_node) {
     char *result = NULL;
-    
-    switch (node->operands.identity.value_type) {
-        case AST_VALUE_INT: {
-            result = malloc((12 + 4) * sizeof(char)); //int@num
-            if (result) {
-                sprintf(result, "int@%d", node->operands.identity.value.int_value);
-            }
+    ast_value_type type;
+    int int_val;
+    float float_val;
+    char *char_val;
+    if(expr_node) {
+        type = expr_node->operands.identity.value_type;
+        switch (type) {
+        case AST_VALUE_INT:
+            int_val = expr_node->operands.identity.value.int_value;
+            break;
+        case AST_VALUE_FLOAT:
+            float_val = expr_node->operands.identity.value.double_value;
+            break;
+        case AST_VALUE_NULL:
+            break;
+        default:
+            char_val = expr_node->operands.identity.value.string_value;
             break;
         }
+    }
+    else{
+        type = param_node->value_type;
+        switch (type) {
+        case AST_VALUE_INT:
+            int_val = param_node->value.int_value;
+            break;
+        case AST_VALUE_FLOAT:
+            float_val = param_node->value.double_value;
+            break;
+        case AST_VALUE_NULL:
+            break;
+        default:
+            char_val = param_node->value.string_value;
+            break;
+        }
+    }
+    switch (type) {
+        case AST_VALUE_INT:
+            result = malloc((12 + 4) * sizeof(char));
+            if (result) {
+                sprintf(result, "int@%d", int_val);
+            }
+            break;
         
-        case AST_VALUE_FLOAT: {
+        case AST_VALUE_FLOAT:
             result = malloc((64 + 6) * sizeof(char));
             if (result) {
-                sprintf(result, "float@%a", node->operands.identity.value.double_value);
+                sprintf(result, "float@%a", float_val);
             }
             break;
-        }
         
-        case AST_VALUE_STRING: {
-            result = escape_string_literal(node->operands.identity.value.string_value);
+        case AST_VALUE_IDENTIFIER:
+            result = var_frame_parse(char_val);
             break;
-        }
-        case AST_VALUE_NULL: {
+
+        case AST_VALUE_STRING:
+            result = escape_string_literal(char_val);
+            break;
+
+        case AST_VALUE_NULL:
             result = malloc((8) * sizeof(char));
             result = "nil@nil";
             break;
-        }
         
         default:
             return NULL;
     }
-    
     return result;
 }
 
@@ -554,7 +590,7 @@ void generate_binary(generator gen, char * result, ast_expression node){
 void generate_expression(generator gen, char * result, ast_expression node){
     
     if (node->type == AST_VALUE)
-        move_var(gen, ast_value_to_string(node), result);
+        move_var(gen, ast_value_to_string(node, NULL), result);
     else if(node->type == AST_ID){ //not expression
         move_var(gen, result, node->operands.identifier.value); //move LF@var value
     }
@@ -576,14 +612,14 @@ void generate_expression(generator gen, char * result, ast_expression node){
 
 void generate_ifjfunction(generator gen, char* name, ast_parameter params, char* output){ 
     if(strcmp(name, "str") == 0)
-        ifj_float2char(gen, output, params->name);
-    //else if(strcmp(name, "chr"))
+        ifj_float2char(gen, output, ast_value_to_string(NULL, params));
+    //else if(strcmp(name, "chr") == 0)
     else if(strcmp(name, "floor") == 0)
-        ifj_float2int(gen, output, params->name);
+        ifj_float2int(gen, output, ast_value_to_string(NULL, params));
     else if(strcmp(name, "length") == 0)
-        ifj_strlen(gen, output, params->name);
+        ifj_strlen(gen, output, ast_value_to_string(NULL, params));
     else if(strcmp(name, "ord") == 0){
-        ifj_getchar(gen, "GF@tmp_ifj", params->name, params->next->name);
+        ifj_getchar(gen, "GF@tmp_ifj", ast_value_to_string(NULL, params), ast_value_to_string(NULL, params->next));
         ifj_stri2int(gen, output, "GF@tmp_ifj");
     }
     else if(strcmp(name, "read_num") == 0)
@@ -591,10 +627,15 @@ void generate_ifjfunction(generator gen, char* name, ast_parameter params, char*
     else if(strcmp(name, "read_str") == 0)
         ifj_read(gen, output, "string");
     else if(strcmp(name, "strcmp") == 0)
-        op_eq(gen, output, params->name, params->next->name);
+        op_eq(gen, output, ast_value_to_string(NULL, params), ast_value_to_string(NULL, params->next));
     //else if(strcmp(name, "substring"))
     else if(strcmp(name, "write") == 0)
-        ifj_write(gen, params->name);
+        ifj_write(gen, ast_value_to_string(NULL, params));
+    else {
+        string_append_literal(gen->output, "#IFJ FUN: ");
+        string_append_literal(gen->output, name);
+        string_append_literal(gen->output, " not implemented\n");
+    }
 }
 
 void generate_function_call(generator gen, ast_node node){
@@ -603,7 +644,7 @@ void generate_function_call(generator gen, ast_node node){
 
     ast_parameter param = node->data.function_call->parameters;
     while(param != NULL){
-        stack_push(&stack, param->name);
+        stack_push(&stack, ast_value_to_string(NULL, param));
         param = param->next;
     }
     char *param_name;
@@ -617,7 +658,8 @@ void generate_function_call(generator gen, ast_node node){
 }
 
 void generate_function_return(generator gen, ast_node node){
-    generate_expression(gen, "GF@fn_ret", node->data.return_expr.output);
+    if(node->data.return_expr.output)
+        generate_expression(gen, "GF@fn_ret", node->data.return_expr.output);
     popframe(gen);
     return_code(gen);
 }
@@ -826,8 +868,8 @@ void generate_function(generator gen, ast_node node){
     createframe(gen); //create function frame
     pushframe(gen); //use new frame
     while(param != NULL){
-        define_variable(gen, param->name);
-        pop(gen, param->name);
+        define_variable(gen, ast_value_to_string(NULL, param));
+        pop(gen, ast_value_to_string(NULL, param));
         param = param->next;
     }
     if(node->type == AST_SETTER) {

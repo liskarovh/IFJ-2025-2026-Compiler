@@ -250,7 +250,7 @@ static int symtab_insert_symbol(semantic *semantic_table,
 
     const char *current_scope = sem_scope_ids_current(&semantic_table->ids);
     const char *scope_text = current_scope ? current_scope : "global";
-    const char *name_text = identifier_name ? identifier_name : "(null)";
+    const char *name_text  = identifier_name ? identifier_name : "(null)";
 
     char symbol_key[SEM_MAX_SCOPE_PATH + 128];
     size_t max_total = sizeof(symbol_key) - 1;
@@ -305,8 +305,8 @@ static int symtab_insert_accessor_symbol(semantic *semantic_table,
     }
 
     const char *current_scope = sem_scope_ids_current(&semantic_table->ids);
-    const char *scope_text = current_scope ? current_scope : "global";
-    const char *suffix = is_setter ? "set" : "get";
+    const char *scope_text    = current_scope ? current_scope : "global";
+    const char *suffix        = is_setter ? "set" : "get";
 
     char symbol_key[SEM_MAX_SCOPE_PATH + 128];
     size_t max_total = sizeof(symbol_key) - 1;
@@ -387,7 +387,7 @@ static void make_function_key(char *buffer,
         buffer[pos++] = '#';
         char number_buffer[32];
         sem_uint_to_dec(number_buffer, sizeof number_buffer, (unsigned int)arity);
-        size_t num_len = strlen(number_buffer);
+        size_t num_len   = strlen(number_buffer);
         size_t remaining = max_total - pos;
         if (num_len > remaining) {
             num_len = remaining;
@@ -444,7 +444,7 @@ static void make_accessor_key(char *buffer,
         return;
     }
 
-    const char *prefix = is_setter ? "set" : "get";
+    const char *prefix    = is_setter ? "set" : "get";
     const char *name_text = base_name ? base_name : "(null)";
 
     size_t max_total = buffer_size - 1;
@@ -482,6 +482,26 @@ static int count_parameters(ast_parameter parameter_list) {
         parameter_list = parameter_list->next;
     }
     return parameter_count;
+}
+
+/**
+ * @brief Extract the "name" of a parameter from ast_parameter.
+ *
+ * For your AST, parameter names are stored as:
+ *  - value_type == AST_VALUE_IDENTIFIER
+ *  - value.string_value == identifier text.
+ */
+static const char *sem_get_parameter_name(ast_parameter parameter) {
+    if (!parameter) {
+        return NULL;
+    }
+
+    if (parameter->value_type == AST_VALUE_IDENTIFIER ||
+        parameter->value_type == AST_VALUE_STRING) {
+        return parameter->value.string_value;
+    }
+
+    return NULL;
 }
 
 /**
@@ -604,8 +624,8 @@ static int function_table_insert_signature(semantic *semantic_table,
 
     function_data->symbol_type = ST_FUN;
     function_data->param_count = arity;
-    function_data->defined = false;
-    function_data->global = true;
+    function_data->defined     = false;
+    function_data->global      = true;
 
     // store scope_name (class name)
     if (class_scope_name) {
@@ -647,10 +667,10 @@ static int function_table_insert_signature(semantic *semantic_table,
             if (any_data) {
                 any_data->symbol_type = ST_FUN;
                 any_data->param_count = 0;
-                any_data->defined = false;
-                any_data->global = true;
-                any_data->ID = NULL;
-                any_data->scope_name = NULL;
+                any_data->defined     = false;
+                any_data->global      = true;
+                any_data->ID          = NULL;
+                any_data->scope_name  = NULL;
             }
         }
     }
@@ -697,8 +717,8 @@ static int function_table_insert_accessor(semantic *semantic_table,
 
     accessor_data->symbol_type = ST_FUN;
     accessor_data->param_count = is_setter ? 1 : 0;
-    accessor_data->defined = false;
-    accessor_data->global = true;
+    accessor_data->defined     = false;
+    accessor_data->global      = true;
 
     if (class_scope_name) {
         accessor_data->scope_name = string_create(0);
@@ -917,26 +937,24 @@ static int sem_check_literal_binary(int op,
 }
 
 /**
- * @brief Visit a function-call expression node.
+ * @brief Visit a function-call expression node (AST_FUNCTION_CALL).
  */
 static int sem_visit_call_expr(semantic *semantic_table,
                                ast_expression expression_node) {
-    if (!expression_node) {
+    if (!expression_node || !expression_node->operands.function_call) {
         return SUCCESS;
     }
 
-    const char *called_name = expression_node->operands.function_call.name;
+    ast_fun_call call_node = expression_node->operands.function_call;
 
-    /* For expression calls we trust the cached parameter_count
-     * stored by the parser in ast_function_call.
-     */
-    int parameter_count =
-        (int)expression_node->operands.function_call.parameter_count;
+    const char *called_name = call_node->name;
+    int parameter_count     = count_parameters(call_node->parameters);
 
     return check_function_call_arity(semantic_table,
                                      called_name,
                                      parameter_count);
 }
+
 
 /**
  * @brief Visit a binary-like expression node (including ternary/IS).
@@ -1098,22 +1116,30 @@ static int declare_parameter_list_in_current_scope(semantic *semantic_table,
     for (ast_parameter parameter = parameter_list;
          parameter;
          parameter = parameter->next) {
+
+        const char *param_name = sem_get_parameter_name(parameter);
+
         fprintf(stdout,
                 "[sem] param declare: %s (scope=%s)\n",
-                parameter->name,
+                param_name ? param_name : "(null)",
                 sem_scope_ids_current(&semantic_table->ids));
 
+        if (!param_name) {
+            return error(ERR_INTERNAL,
+                         "parameter without name in current scope");
+        }
+
         if (!scopes_declare_local(&semantic_table->scopes,
-                                  parameter->name,
+                                  param_name,
                                   true)) {
             return error(ERR_REDEF,
                          "parameter '%s' redeclared in the same scope",
-                         parameter->name);
+                         param_name ? param_name : "(null)");
         }
 
         st_data *parameter_data =
             scopes_lookup_in_current(&semantic_table->scopes,
-                                     parameter->name);
+                                     param_name);
         if (parameter_data) {
             parameter_data->symbol_type = ST_PAR;
         }
@@ -1121,7 +1147,7 @@ static int declare_parameter_list_in_current_scope(semantic *semantic_table,
         int result_code =
             symtab_insert_symbol(semantic_table,
                                  ST_PAR,
-                                 parameter->name,
+                                 param_name,
                                  0);
         if (result_code != SUCCESS) {
             return result_code;
@@ -1129,6 +1155,7 @@ static int declare_parameter_list_in_current_scope(semantic *semantic_table,
     }
     return SUCCESS;
 }
+
 
 /**
  * @brief Visit a block: push scope, assign scope-ID, visit all nodes, pop.
@@ -1287,7 +1314,7 @@ static int sem_handle_function_node(semantic *semantic_table,
  */
 static int sem_handle_getter_node(semantic *semantic_table,
                                   ast_node node) {
-    const char *name = node->data.getter.name;
+    const char *name  = node->data.getter.name;
     const char *gname = name ? name : "(null)";
 
     fprintf(stdout,
@@ -1531,8 +1558,7 @@ static int visit_statement_node(semantic *semantic_table,
 
         case AST_CALL_FUNCTION: {
             ast_fun_call call_node = node->data.function_call;
-            int parameter_count =
-                count_parameters(call_node->parameters);
+            int parameter_count    = count_parameters(call_node->parameters);
             return check_function_call_arity(semantic_table,
                                              call_node->name,
                                              parameter_count);
@@ -1608,18 +1634,21 @@ static int collect_headers_from_block(semantic *semantic_table,
         switch (node->type) {
             case AST_FUNCTION: {
                 ast_function function_node = node->data.function;
-                const char *function_name =
-                    function_node->name;
+                const char *function_name  = function_node->name;
+
                 fprintf(stdout,
                         "[sem] header: %s params=",
                         function_name ? function_name : "(null)");
                 const char *separator = "";
-                for (ast_parameter parameter =
-                         function_node->parameters;
+                for (ast_parameter parameter = function_node->parameters;
                      parameter;
                      parameter = parameter->next) {
+
+                    const char *param_name = sem_get_parameter_name(parameter);
+
                     fprintf(stdout, "%s%s",
-                            separator, parameter->name);
+                            separator,
+                            param_name ? param_name : "(null)");
                     separator = ", ";
                 }
                 fprintf(stdout, "\n");

@@ -186,7 +186,7 @@ static bool keyword_lookup(const char *text, size_t text_len, int *out_type) {
     if (is_kw(text, text_len, "static"))   { *out_type = T_KW_STATIC;   return true; }
     if (is_kw(text, text_len, "import"))   { *out_type = T_KW_IMPORT;   return true; }
     if (is_kw(text, text_len, "for"))      { *out_type = T_KW_FOR;      return true; }
-    if (is_kw(text, text_len, "num"))      { *out_type = T_KW_NUM;      return true; }
+    if (is_kw(text, text_len, "Num"))      { *out_type = T_KW_NUM;      return true; }
     if (is_kw(text, text_len, "string"))   { *out_type = T_KW_STRING;   return true; }
     if (is_kw(text, text_len, "nulltype")) { *out_type = T_KW_NULLTYPE; return true; }
     if (is_kw(text, text_len, "ifj"))      { *out_type = T_KW_IFJ;      return true; }

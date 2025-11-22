@@ -48,7 +48,7 @@ int main() {
     
 
     free(gen);
-    ast_dispose(ast_tree);
+    //ast_dispose(ast_tree);
     DLLTokens_Dispose(&token_list);
 
     return result;

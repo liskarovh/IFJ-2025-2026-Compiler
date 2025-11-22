@@ -52,6 +52,8 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
         out_ast->import = ast_import_init();
 
         DLLTokens_Next(tokenList);
+        if (tokenList->active->token->type == T_EOL)
+            DLLTokens_Next(tokenList);
 
         int err = parser(tokenList, out_ast, GRAMMAR_IMPORT_IFJ25);
         if (err != SUCCESS) {
@@ -88,6 +90,8 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
         break;
     }
     case GRAMMAR_IMPORT_IFJ: {
+        if (tokenList->active->token->type == T_EOL)
+            DLLTokens_Next(tokenList);
         if(strcmp(tokenList->active->token->value->data, "Ifj") != 0) {
             return ERR_SYN;
         }
@@ -343,6 +347,10 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
             return ERR_SYN;
         }
         DLLTokens_Next(tokenList);
+        if(current_class->current->current->type == AST_CALL_FUNCTION || current_class->current->current->type == AST_IFJ_FUNCTION) {
+            if (tokenList->active->token->type != T_EOL)
+                return ERR_SYN;
+        }
         break;
     }
     case GRAMMAR_PARAM_LIST: {
@@ -350,16 +358,30 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
             break;
         }
 
-        if(tokenList->active->token->type != T_IDENT) {
+        int token_type = tokenList->active->token->type;
+        if(token_type != T_IDENT && token_type != T_STRING &&
+            token_type != T_ML_STRING && token_type != T_FLOAT &&
+            token_type != T_INT && token_type != T_BOOL_FALSE &&
+            token_type != T_BOOL_TRUE && token_type != T_GLOB_IDENT) {
             return ERR_SYN;
         }
 
         if(current_class->current->current != NULL) {
             if(current_class->current->current->type == AST_FUNCTION) {
+                if (token_type != T_IDENT) return ERR_SEM;
                 ast_function current_function = current_class->current->current->data.function;
                 if(current_function->parameters == NULL) {
                     current_function->parameters = malloc(sizeof(struct ast_parameter));
-                    current_function->parameters->name = tokenList->active->token->value->data;
+                    if(tokenList->active->token->type == T_FLOAT) {
+                        current_function->parameters->value_type = AST_VALUE_FLOAT;
+                        current_function->parameters->value.double_value = tokenList->active->token->value_float;
+                    } else if (tokenList->active->token->type == T_INT) {
+                        current_function->parameters->value_type = AST_VALUE_INT;
+                        current_function->parameters->value.int_value = tokenList->active->token->value_int;
+                    } else {
+                        current_function->parameters->value_type = AST_VALUE_STRING;
+                        current_function->parameters->value.string_value = tokenList->active->token->value->data;
+                    }
                     current_function->parameters->next = NULL;
                 } else {
                     ast_parameter param_iter = current_function->parameters;
@@ -367,14 +389,32 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
                         param_iter = param_iter->next;
                     }
                     param_iter->next = malloc(sizeof(struct ast_parameter));
-                    param_iter->next->name = tokenList->active->token->value->data;
+                    if(tokenList->active->token->type == T_FLOAT) {
+                        param_iter->next->value_type = AST_VALUE_FLOAT;
+                        param_iter->next->value.double_value = tokenList->active->token->value_float;
+                    } else if (tokenList->active->token->type == T_INT) {
+                        param_iter->next->value_type = AST_VALUE_INT;
+                        param_iter->next->value.int_value = tokenList->active->token->value_int;
+                    } else {
+                        param_iter->next->value_type = AST_VALUE_STRING;
+                        param_iter->next->value.string_value = tokenList->active->token->value->data;
+                    }
                     param_iter->next->next = NULL;
                 }
             } else if(current_class->current->current->type == AST_CALL_FUNCTION) {
                 ast_fun_call current_fun_call = current_class->current->current->data.function_call;
                 if(current_fun_call->parameters == NULL) {
                     current_fun_call->parameters = malloc(sizeof(struct ast_parameter));
-                    current_fun_call->parameters->name = tokenList->active->token->value->data;
+                    if(tokenList->active->token->type == T_FLOAT) {
+                        current_fun_call->parameters->value_type = AST_VALUE_FLOAT;
+                        current_fun_call->parameters->value.double_value = tokenList->active->token->value_float;
+                    } else if (tokenList->active->token->type == T_INT) {
+                        current_fun_call->parameters->value_type = AST_VALUE_INT;
+                        current_fun_call->parameters->value.int_value = tokenList->active->token->value_int;
+                    } else {
+                        current_fun_call->parameters->value_type = AST_VALUE_STRING;
+                        current_fun_call->parameters->value.string_value = tokenList->active->token->value->data;
+                    }
                     current_fun_call->parameters->next = NULL;
                 } else {
                     ast_parameter param_iter = current_fun_call->parameters;
@@ -382,14 +422,32 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
                         param_iter = param_iter->next;
                     }
                     param_iter->next = malloc(sizeof(struct ast_parameter));
-                    param_iter->next->name = tokenList->active->token->value->data;
+                    if(tokenList->active->token->type == T_FLOAT) {
+                        param_iter->next->value_type = AST_VALUE_FLOAT;
+                        param_iter->next->value.double_value = tokenList->active->token->value_float;
+                    } else if (tokenList->active->token->type == T_INT) {
+                        param_iter->next->value_type = AST_VALUE_INT;
+                        param_iter->next->value.int_value = tokenList->active->token->value_int;
+                    } else {
+                        param_iter->next->value_type = AST_VALUE_STRING;
+                        param_iter->next->value.string_value = tokenList->active->token->value->data;
+                    }
                     param_iter->next->next = NULL;
                 }
             } else if(current_class->current->current->type == AST_IFJ_FUNCTION) {
                 ast_ifj_function current_ifj_function = current_class->current->current->data.ifj_function;
                 if(current_ifj_function->parameters == NULL) {
                     current_ifj_function->parameters = malloc(sizeof(struct ast_parameter));
-                    current_ifj_function->parameters->name = tokenList->active->token->value->data;
+                    if(tokenList->active->token->type == T_FLOAT) {
+                        current_ifj_function->parameters->value_type = AST_VALUE_FLOAT;
+                        current_ifj_function->parameters->value.double_value = tokenList->active->token->value_float;
+                    } else if (tokenList->active->token->type == T_INT) {
+                        current_ifj_function->parameters->value_type = AST_VALUE_INT;
+                        current_ifj_function->parameters->value.int_value = tokenList->active->token->value_int;
+                    } else {
+                        current_ifj_function->parameters->value_type = AST_VALUE_STRING;
+                        current_ifj_function->parameters->value.string_value = tokenList->active->token->value->data;
+                    }
                     current_ifj_function->parameters->next = NULL;
                 } else {
                     ast_parameter param_iter = current_ifj_function->parameters;
@@ -397,7 +455,16 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
                         param_iter = param_iter->next;
                     }
                     param_iter->next = malloc(sizeof(struct ast_parameter));
-                    param_iter->next->name = tokenList->active->token->value->data;
+                    if(tokenList->active->token->type == T_FLOAT) {
+                        param_iter->next->value_type = AST_VALUE_FLOAT;
+                        param_iter->next->value.double_value = tokenList->active->token->value_float;
+                    } else if (tokenList->active->token->type == T_INT) {
+                        param_iter->next->value_type = AST_VALUE_INT;
+                        param_iter->next->value.int_value = tokenList->active->token->value_int;
+                    } else {
+                        param_iter->next->value_type = AST_VALUE_STRING;
+                        param_iter->next->value.string_value = tokenList->active->token->value->data;
+                    }
                     param_iter->next->next = NULL;
                 }
             }
@@ -419,13 +486,31 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
             return ERR_SYN;
         }
         DLLTokens_Next(tokenList);
-        if(tokenList->active->token->type != T_IDENT) {
+        if(tokenList->active->token->type != T_IDENT && tokenList->active->token->type != T_GLOB_IDENT) {
             return ERR_SYN;
         }
         ast_add_new_node(&current_class, AST_VAR_DECLARATION);
-        current_class->current->current->data.declaration.name = tokenList->active->token->value->data;
+        char *var_name = tokenList->active->token->value->data;
+        current_class->current->current->data.declaration.name = var_name;
         DLLTokens_Next(tokenList);
-        if(tokenList->active->token->type != T_EOL) {
+
+        if (tokenList->active->token->type == T_ASSIGN) {
+            ast_add_new_node(&current_class, AST_ASSIGNMENT); 
+        
+            // 4. Nastavit název u přiřazení pomocí uložené proměnné 'var_name'
+            current_class->current->current->data.assignment.name = var_name; // Použijeme var_name
+            
+            DLLTokens_Next(tokenList);
+            
+            // Zbytek logiky pro výraz
+            ast_expression current_expression; 
+            int err = parse_expr(tokenList, &current_expression);
+            if (err != SUCCESS) {
+                return err;
+            }
+            current_class->current->current->data.assignment.value = current_expression;
+        }
+        else if (tokenList->active->token->type != T_EOL) {
             return ERR_SYN;
         }
         break;
@@ -520,7 +605,7 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
         }
 
         if(tokenList->active->token->type != T_KW_ELSE) {
-            return ERR_SYN;
+            return SUCCESS;
         }
         DLLTokens_Next(tokenList);
 
@@ -644,7 +729,7 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
             return ERR_SYN;
         }
         DLLTokens_Next(tokenList);
-        
+
         if(tokenList->active->token->type != T_DOT) {
             return ERR_SYN;
         }

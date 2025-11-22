@@ -431,7 +431,12 @@ void ast_print_node(ast_node node, char *offset) {
             printf(", parameters: ");
             ast_parameter parameter = node->data.function->parameters;
             while(parameter != NULL) {
-                printf("%s", parameter->name);
+                if (parameter->value_type == AST_VALUE_INT)
+                    printf("%d", parameter->value.int_value);
+                else if (parameter->value_type == AST_VALUE_FLOAT)
+                    printf("%f", parameter->value.double_value);
+                else
+                    printf("%s", parameter->value.string_value);
                 parameter = parameter->next;
                 if(parameter != NULL) {
                     printf(", ");
@@ -451,7 +456,12 @@ void ast_print_node(ast_node node, char *offset) {
             printf(", parameters: ");
             ast_parameter parameter = node->data.function_call->parameters;
             while(parameter != NULL) {
-                printf("%s", parameter->name);
+                if (parameter->value_type == AST_VALUE_INT)
+                    printf("%d", parameter->value.int_value);
+                else if (parameter->value_type == AST_VALUE_FLOAT)
+                    printf("%f", parameter->value.double_value);
+                else
+                    printf("%s", parameter->value.string_value);
                 parameter = parameter->next;
                 if(parameter != NULL) {
                     printf(", ");
@@ -505,7 +515,12 @@ void ast_print_node(ast_node node, char *offset) {
             printf(", parameters: ");
             ast_parameter parameter = node->data.ifj_function->parameters;
             while(parameter != NULL) {
-                printf("%s", parameter->name);
+                if (parameter->value_type == AST_VALUE_INT)
+                    printf("%d", parameter->value.int_value);
+                else if (parameter->value_type == AST_VALUE_FLOAT)
+                    printf("%f", parameter->value.double_value);
+                else
+                    printf("%s", parameter->value.string_value);
                 parameter = parameter->next;
                 if(parameter != NULL) {
                     printf(", ");
@@ -601,7 +616,12 @@ void ast_print_expression(ast_expression expr, char *offset) {
                 printf(", parameters: ");
                 ast_parameter parameter = expr->operands.ifj_function->parameters;
                 while(parameter != NULL) {
-                    printf("%s", parameter->name);
+                    if (parameter->value_type == AST_VALUE_INT)
+                        printf("%d", parameter->value.int_value);
+                    else if (parameter->value_type == AST_VALUE_FLOAT)
+                        printf("%f", parameter->value.double_value);
+                    else
+                        printf("%s", parameter->value.string_value);
                     parameter = parameter->next;
                     if(parameter != NULL) {
                         printf(", ");
@@ -615,8 +635,13 @@ void ast_print_expression(ast_expression expr, char *offset) {
             if(expr->operands.function_call->parameters != NULL) {
                 printf(", parameters: ");
                 ast_parameter parameter = expr->operands.function_call->parameters;
-                while(parameter != NULL) {
-                    printf("%s", parameter->name);
+                while(parameter) {
+                    if (parameter->value_type == AST_VALUE_INT)
+                        printf("%d", parameter->value.int_value);
+                    else if (parameter->value_type == AST_VALUE_FLOAT)
+                        printf("%f", parameter->value.double_value);
+                    else
+                        printf("%s", parameter->value.string_value);
                     parameter = parameter->next;
                     if(parameter != NULL) {
                         printf(", ");

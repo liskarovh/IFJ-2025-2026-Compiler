@@ -64,7 +64,12 @@ typedef enum {
 } ast_value_type;
 
 typedef struct ast_parameter {
-    char *name;
+    ast_value_type value_type;
+    union {
+        int int_value;
+        double double_value;
+        char *string_value;
+    } value;
     struct ast_parameter *next;
 } *ast_parameter;
 

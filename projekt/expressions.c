@@ -76,6 +76,7 @@ prec_table_enum token_to_expr(tokenPtr token) {
         case T_STRING: return STRING;
         case T_IDENT: return ID;
         case T_GLOB_IDENT: return ID;
+        case T_KW_NUM: return ID;
         case T_KW_IS: return IS;
         
 
@@ -323,7 +324,8 @@ int parse_expr(DLListTokens *tokenlist, ast_expression *out_ast){
                     int type = tokenlist->active->token->type;
                     if(type != T_IDENT && type != T_STRING && type != T_ML_STRING && 
                         type != T_FLOAT && type != T_INT && 
-                        type != T_BOOL_FALSE && type != T_BOOL_TRUE) {
+                        type != T_BOOL_FALSE && type != T_BOOL_TRUE &&
+                        type != T_GLOB_IDENT) {
                         return ERR_SYN;
                     }
 
@@ -331,7 +333,18 @@ int parse_expr(DLListTokens *tokenlist, ast_expression *out_ast){
                     if (new_param == NULL) {
                         return ERR_INTERNAL;
                     }
-                    new_param->name = tokenlist->active->token->value->data;
+                    
+                    if(tokenlist->active->token->type == T_FLOAT) {
+                        new_param->value_type = AST_VALUE_FLOAT;
+                        new_param->value.double_value = tokenlist->active->token->value_float;
+                    } else if (tokenlist->active->token->type == T_INT) {
+                        new_param->value_type = AST_VALUE_INT;
+                        new_param->value.int_value = tokenlist->active->token->value_int;
+                    } else {
+                        new_param->value_type = AST_VALUE_STRING;
+                        new_param->value.string_value = tokenlist->active->token->value->data;
+                    }
+
                     new_param->next = NULL;
 
                     if (item.expr->operands.function_call->parameters == NULL) {
@@ -386,7 +399,8 @@ int parse_expr(DLListTokens *tokenlist, ast_expression *out_ast){
                     int type = tokenlist->active->token->type;
                     if(type != T_IDENT && type != T_STRING && type != T_ML_STRING && 
                         type != T_FLOAT && type != T_INT && 
-                        type != T_BOOL_FALSE && type != T_BOOL_TRUE) {
+                        type != T_BOOL_FALSE && type != T_BOOL_TRUE &&
+                        type != T_GLOB_IDENT) {
                         return ERR_SYN;
                     }
 
@@ -394,7 +408,16 @@ int parse_expr(DLListTokens *tokenlist, ast_expression *out_ast){
                     if (new_param == NULL) {
                         return ERR_INTERNAL;
                     }
-                    new_param->name = tokenlist->active->token->value->data;
+                    if(tokenlist->active->token->type == T_FLOAT) {
+                        new_param->value_type = AST_VALUE_FLOAT;
+                        new_param->value.double_value = tokenlist->active->token->value_float;
+                    } else if (tokenlist->active->token->type == T_INT) {
+                        new_param->value_type = AST_VALUE_INT;
+                        new_param->value.int_value = tokenlist->active->token->value_int;
+                    } else {
+                        new_param->value_type = AST_VALUE_STRING;
+                        new_param->value.string_value = tokenlist->active->token->value->data;
+                    }
                     new_param->next = NULL;
 
                     if (item.expr->operands.ifj_function->parameters == NULL) {

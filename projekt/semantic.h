@@ -95,4 +95,6 @@ typedef struct semantic_ctx {
  */
 int semantic_pass1(ast tree);
 
+int semantic_pass2(semantic *table, ast tree);
+
 #endif /* SEMANTIC_H */

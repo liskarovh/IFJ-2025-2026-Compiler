@@ -1994,9 +1994,370 @@ int semantic_pass1(ast syntax_tree) {
 
     // Final symbol table dump
     sem_pretty_print_symbol_table(&semantic_table);
-
+    semantic_pass2(&semantic_table,syntax_tree);
     st_free(semantic_table.funcs);
     st_free(semantic_table.symtab);
 
+    return SUCCESS;
+}
+
+
+/* =========================================================================
+ *                              Pass 2
+ * ========================================================================= */
+
+static int sem2_visit_block(semantic *table, ast_block blk);
+
+/* -------------------------------------------------------------------------
+ *  Identifier resolver (with rich debug)
+ * ------------------------------------------------------------------------- */
+static int sem2_resolve_identifier(semantic *cxt, const char *name)
+{
+    if (!name) return SUCCESS;
+
+    printf("[sem2][ID] Resolving '%s' at scope=%s\n",
+           name, sem_scope_ids_current(&cxt->ids));
+
+    /* Magic globals */
+    if (is_magic_global_identifier(name)) {
+        printf("[sem2][ID] → magic global OK\n");
+        return SUCCESS;
+    }
+
+    /* Local var/param */
+    st_data *local = scopes_lookup(&cxt->scopes, name);
+    if (local) {
+        printf("[sem2][ID] → local OK (symbol_type=%d)\n", local->symbol_type);
+        return SUCCESS;
+    }
+
+    /* Accessor check */
+    char key_get[256], key_set[256];
+    make_accessor_key(key_get, sizeof key_get, name, false);
+    make_accessor_key(key_set, sizeof key_set, name, true);
+
+    printf("[sem2][ID] Trying accessor keys: get='%s', set='%s'\n",
+           key_get, key_set);
+
+    bool has_getter = (st_find(cxt->funcs, key_get) != NULL);
+    bool has_setter = (st_find(cxt->funcs, key_set) != NULL);
+
+    if (has_getter) {
+        printf("[sem2][ID] → getter OK\n");
+        return SUCCESS;
+    }
+
+    if (has_setter) {
+        printf("[sem2][ID] → setter exists but no getter → ERROR\n");
+        return error(ERR_DEF,
+                     "use of setter-only property '%s' without getter",
+                     name);
+    }
+
+    printf("[sem2][ID] → ERROR undefined identifier\n");
+    return error(ERR_DEF,
+                 "use of undefined identifier '%s'", name);
+}
+
+/* -------------------------------------------------------------------------
+ *  Function call checker
+ * ------------------------------------------------------------------------- */
+static int sem2_check_function_call(semantic *cxt,
+                                    const char *name,
+                                    int arity)
+{
+    printf("[sem2][CALL] Checking %s(%d) at scope=%s\n",
+           name ? name : "(null)",
+           arity,
+           sem_scope_ids_current(&cxt->ids));
+
+    if (!name) {
+        printf("[sem2][CALL] Name null → skipping\n");
+        return SUCCESS;
+    }
+
+    /* Builtins */
+    if (is_builtin_qualified_name(name)) {
+        char key[256];
+        make_function_key(key, sizeof key, name, arity);
+
+        printf("[sem2][CALL] → builtin, key='%s'\n", key);
+
+        if (!st_find(cxt->funcs, key)) {
+            printf("[sem2][CALL] → ERROR builtin wrong arity\n");
+            return error(ERR_ARGNUM,
+                         "wrong number of arguments for builtin %s(%d)",
+                         name, arity);
+        }
+
+        printf("[sem2][CALL] → builtin OK\n");
+        return SUCCESS;
+    }
+
+    /* User functions */
+    char sig_key[256];
+    make_function_key(sig_key, sizeof sig_key, name, arity);
+    printf("[sem2][CALL] → user key='%s'\n", sig_key);
+
+    if (function_table_has_signature(cxt, name, arity)) {
+        printf("[sem2][CALL] → user OK exact match\n");
+        return SUCCESS;
+    }
+
+    if (function_table_has_any_overload(cxt, name)) {
+        printf("[sem2][CALL] → overload exists but wrong arity → ERROR\n");
+        return error(ERR_ARGNUM,
+                     "wrong number of arguments for %s (arity=%d)",
+                     name, arity);
+    }
+
+    printf("[sem2][CALL] → no such function → ERROR\n");
+    return error(ERR_DEF, "call to undefined function '%s'", name);
+}
+
+/* -------------------------------------------------------------------------
+ *  Expression visitor (recursive)
+ * ------------------------------------------------------------------------- */
+static int sem2_visit_expr(semantic *cxt, ast_expression e)
+{
+    if (!e) return SUCCESS;
+
+    printf("[sem2][EXPR] Visiting expr type=%d at scope=%s\n",
+           e->type, sem_scope_ids_current(&cxt->ids));
+
+    switch (e->type) {
+
+        case AST_IDENTIFIER:
+            printf("[sem2][EXPR] → IDENT '%s'\n", e->operands.identifier.value);
+            return sem2_resolve_identifier(cxt, e->operands.identifier.value);
+
+        case AST_VALUE:
+            printf("[sem2][EXPR] → literal value OK\n");
+            return SUCCESS;
+
+        case AST_FUNCTION_CALL: {
+            ast_fun_call call = e->operands.function_call;
+            if (!call) {
+                printf("[sem2][EXPR] → null function call\n");
+                return SUCCESS;
+            }
+
+            int ar = count_parameters(call->parameters);
+            printf("[sem2][EXPR] → FUNCTION_CALL '%s' arity=%d\n",
+                   call->name, ar);
+
+            int rc = sem2_check_function_call(cxt, call->name, ar);
+            if (rc != SUCCESS) return rc;
+
+            /* Resolve parameters */
+            for (ast_parameter p = call->parameters; p; p = p->next) {
+                printf("[sem2][EXPR] → param value_type=%d\n", p->value_type);
+                if (p->value_type == AST_VALUE_IDENTIFIER) {
+                    rc = sem2_resolve_identifier(cxt, p->value.string_value);
+                    if (rc != SUCCESS) return rc;
+                }
+            }
+            return SUCCESS;
+        }
+
+        case AST_NOT:
+        case AST_NOT_NULL:
+            printf("[sem2][EXPR] → unary\n");
+            return sem2_visit_expr(cxt, e->operands.unary_op.expression);
+
+        /* all binary ops */
+        case AST_ADD: case AST_SUB: case AST_MUL: case AST_DIV:
+        case AST_EQUALS: case AST_NOT_EQUAL:
+        case AST_LT: case AST_LE: case AST_GT: case AST_GE:
+        case AST_AND: case AST_OR:
+        case AST_TERNARY: case AST_IS: case AST_CONCAT:
+            printf("[sem2][EXPR] → binary\n");
+            if (sem2_visit_expr(cxt, e->operands.binary_op.left) != SUCCESS)
+                return ERR_INTERNAL;
+            return sem2_visit_expr(cxt, e->operands.binary_op.right);
+
+        case AST_NONE:
+        case AST_NIL:
+            printf("[sem2][EXPR] → NIL/NONE\n");
+            return SUCCESS;
+
+        default:
+            printf("[sem2][EXPR] → unhandled type\n");
+            return SUCCESS;
+    }
+}
+
+/* -------------------------------------------------------------------------
+ *  Statement visitor
+ * ------------------------------------------------------------------------- */
+static int sem2_visit_statement_node(semantic *table, ast_node node)
+{
+    if (!node) return SUCCESS;
+
+    printf("[sem2][STMT] Node type=%d at scope=%s\n",
+           node->type, sem_scope_ids_current(&table->ids));
+
+    switch (node->type) {
+
+        case AST_BLOCK:
+            printf("[sem2][STMT] → BLOCK\n");
+            return sem2_visit_block(table, node->data.block);
+
+        case AST_CONDITION: {
+            printf("[sem2][STMT] → IF condition\n");
+            int rc = sem2_visit_expr(table, node->data.condition.condition);
+            if (rc != SUCCESS) return rc;
+
+            printf("[sem2][STMT] → IF branch\n");
+            rc = sem2_visit_block(table, node->data.condition.if_branch);
+            if (rc != SUCCESS) return rc;
+
+            printf("[sem2][STMT] → ELSE branch\n");
+            return sem2_visit_block(table, node->data.condition.else_branch);
+        }
+
+        case AST_WHILE_LOOP: {
+            printf("[sem2][STMT] → WHILE\n");
+            int rc = sem2_visit_expr(table, node->data.while_loop.condition);
+            if (rc != SUCCESS) return rc;
+            return sem2_visit_block(table, node->data.while_loop.body);
+        }
+
+        case AST_EXPRESSION:
+            printf("[sem2][STMT] → EXPRESSION\n");
+            return sem2_visit_expr(table, node->data.expression);
+
+        case AST_VAR_DECLARATION: {
+            const char *name = node->data.declaration.name;
+            printf("[sem2] DECLARE var '%s' (scope=%s)\n",
+                name,
+                sem_scope_ids_current(&table->ids));
+
+            // Insert variable into the current scope, same as Pass 1
+            if (!scopes_declare_local(&table->scopes, name, true)) {
+                return error(ERR_REDEF,
+                            "variable '%s' already declared in this scope",
+                            name);
+            }
+        return SUCCESS;
+}
+
+
+        case AST_ASSIGNMENT: {
+            const char *lhs = node->data.assignment.name;
+
+            printf("[sem2] ASSIGN → %s (scope=%s)\n",
+                lhs, sem_scope_ids_current(&table->ids));
+
+            // MUST resolve LHS variable
+            int rc = sem2_resolve_identifier(table, lhs);
+            if (rc != SUCCESS) return rc;
+
+            return sem2_visit_expr(table, node->data.assignment.value);
+}
+
+        case AST_FUNCTION: {
+    // enter function scope
+    sem_scope_enter_block(table);
+
+    // declare parameters "arg", "val", etc.
+    declare_parameter_list_in_current_scope(table, node->data.function->parameters);
+
+    // now visit statements of the function body
+    int rc = sem2_visit_block(table, node->data.function->code);
+
+    sem_scope_leave_block(table, "function body");
+    return rc;
+}
+        case AST_GETTER:
+            printf("[sem2][STMT] → GETTER\n");
+            return sem2_visit_block(table, node->data.getter.body);
+
+        case AST_SETTER:
+            printf("[sem2][STMT] → SETTER\n");
+            return sem2_visit_block(table, node->data.setter.body);
+
+        case AST_CALL_FUNCTION:
+            printf("[sem2][STMT] → CALL_FUNCTION\n");
+            /* Same as expression call */
+            return sem2_visit_expr(table,
+                                   (ast_expression)node->data.function_call);
+
+        case AST_RETURN:
+            printf("[sem2][STMT] → RETURN\n");
+            return sem2_visit_expr(table, node->data.return_expr.output);
+
+        case AST_BREAK:
+        case AST_CONTINUE:
+        case AST_IFJ_FUNCTION:
+            printf("[sem2][STMT] → BREAK/CONTINUE\n");
+            return SUCCESS;
+    }
+
+    printf("[sem2][STMT] → unhandled\n");
+    return SUCCESS;
+}
+
+/* -------------------------------------------------------------------------
+ *  Block visitor
+ * ------------------------------------------------------------------------- */
+static int sem2_visit_block(semantic *table, ast_block blk)
+{
+    if (!blk) return SUCCESS;
+
+    printf("[sem2][BLK] ENTER block (current scope=%s)\n",
+           sem_scope_ids_current(&table->ids));
+
+    sem_scope_enter_block(table);
+
+    printf("[sem2][BLK] NEW scope=%s\n",
+           sem_scope_ids_current(&table->ids));
+
+    for (ast_node n = blk->first; n; n = n->next) {
+        printf("[sem2][BLK] Visiting node...\n");
+        int rc = sem2_visit_statement_node(table, n);
+        if (rc != SUCCESS) {
+            printf("[sem2][BLK] ERROR inside block\n");
+            sem_scope_leave_block(table, "sem2_visit_block");
+            return rc;
+        }
+    }
+
+    printf("[sem2][BLK] LEAVE scope=%s\n",
+           sem_scope_ids_current(&table->ids));
+
+    sem_scope_leave_block(table, "sem2_visit_block");
+    return SUCCESS;
+}
+
+/* -------------------------------------------------------------------------
+ *  Pass 2 entry point
+ * ------------------------------------------------------------------------- */
+int semantic_pass2(semantic *table, ast syntax_tree)
+{
+    printf("[sem2] =========================================\n");
+    printf("[sem2] Starting Pass 2\n");
+    printf("[sem2] =========================================\n");
+
+    table->loop_depth = 0;
+
+    for (ast_class c = syntax_tree->class_list; c; c = c->next) {
+        ast_block root = get_class_root_block(c);
+        printf("[sem2] CLASS → '%s'\n",
+               c->name ? c->name : "(anonymous)");
+
+        if (!root) {
+            printf("[sem2]   (no root block)\n");
+            continue;
+        }
+
+        int rc = sem2_visit_block(table, root);
+        if (rc != SUCCESS) {
+            printf("[sem2] Pass 2 FAILED\n");
+            return rc;
+        }
+    }
+
+    printf("[sem2] Pass 2 completed successfully.\n");
     return SUCCESS;
 }

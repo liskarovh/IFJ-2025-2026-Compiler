@@ -46,13 +46,13 @@ int main() {
     }
 
 
-    ast_print(ast_tree);
+    //ast_print(ast_tree);
 
     init_code(gen, ast_tree);
     generate_code(gen, ast_tree);
     fputs(gen->output->data, stdout);
     
-
+    result = 0;
     free(gen);
     //ast_dispose(ast_tree);
     DLLTokens_Dispose(&token_list);

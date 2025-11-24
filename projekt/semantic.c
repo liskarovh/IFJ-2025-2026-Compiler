@@ -950,16 +950,27 @@ static param_kind sem_get_param_literal_kind(ast_parameter param) {
         return PARAM_KIND_UNKNOWN;
     }
 
+    if ((param->value_type == AST_VALUE_STRING ||
+         param->value_type == AST_VALUE_IDENTIFIER) &&
+        param->value.string_value &&
+        param->value.string_value[0] == '_' &&
+        param->value.string_value[1] == '_') {
+        return PARAM_KIND_UNKNOWN;
+        }
+
     switch (param->value_type) {
         case AST_VALUE_STRING:
             return PARAM_KIND_STRING_LITERAL;
+
         case AST_VALUE_INT:
         case AST_VALUE_FLOAT:
             return PARAM_KIND_NUMERIC_LITERAL;
+
         default:
             return PARAM_KIND_UNKNOWN;
     }
 }
+
 
 /**
  * @brief Basic arity + literal-type checks for selected IFJ built-ins (Ifj.*).

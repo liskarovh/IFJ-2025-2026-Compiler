@@ -1,14 +1,12 @@
 /**
  * @file semantic.c
- * @brief IFJ25 Semantic analysis – Pass 1 (built-ins + signatures + bodies walk) with stdout debug prints.
+ * @brief IFJ25 Semantic analysis – Pass 1 (headers + bodies) and Pass 2 (identifier & call checks).
  *
- * Step 1 (headers):
- *  - Seed IFJ built-ins (arity only) into the global function table.
+ * Pass 1:
+ *  - Seed IFJ built-ins (arity only) into the global function table via builtins_install().
  *  - Collect user function/getter/setter signatures (overload-by-arity) – recursively across nested blocks.
  *  - Verify that main() with arity 0 exists.
- *
- * Step 2 (bodies):
- *  - Walk bodies with scope_stack (locals & parameters),
+ *  - Walk bodies with a scope stack (locals & parameters),
  *  - Maintain a textual scope-ID stack ("1", "1.1", "1.1.2", ...),
  *  - Insert all declared symbols (functions, params, locals, accessors) into a global symtab
  *    with keys "<scope>::<name>",
@@ -17,11 +15,19 @@
  *  - Literal-only expression checks for arithmetic/relational collisions.
  *  - Assignment LHS is checked in Pass-1: unknown identifiers cause ERR_DEF (3),
  *    except for magic globals "__name" and known setters.
+ *  - Built-in calls (Ifj.*) mají v Pass-1 navíc kontrolu arity (z tabulky builtins) + typů argumentů,
+ *    pokud jsou literály (špatný typ -> ERR_ARGNUM=5).
+ *
+ * Pass 2:
+ *  - Druhý průchod nad AST s novým scope stackem:
+ *    - rozlišení identifikátorů (lokální proměnné, parametry, přístupové metody),
+ *    - kontrola volání funkcí (uživatelské i Ifj.*) podle tabulky funkcí (funcs),
+ *    - další ERR_DEF/ERR_ARGNUM podle zadání.
  *
  * Error codes (error.h):
- *  - ERR_DEF     (3)  : main() arity must be 0; use-before-declare of a local / unknown LHS
+ *  - ERR_DEF     (3)  : main() arity must be 0; use-before-declare of a local / unknown LHS / undefined ident / call
  *  - ERR_REDEF   (4)  : duplicate (name,arity); duplicate getter/setter; local redeclare
- *  - ERR_ARGNUM  (5)  : wrong number of arguments in user function call
+ *  - ERR_ARGNUM  (5)  : wrong number or literal types of arguments in function/builtin call
  *  - ERR_EXPR    (6)  : literal-only type error in an expression
  *  - ERR_SEM     (10) : break/continue outside of loop
  *  - ERR_INTERNAL(99) : internal failure (allocation, TS write, ...)
@@ -37,6 +43,9 @@
 #include "error.h"
 #include "string.h"   // project string API (type `string`, string_create, string_append_literal)
 #include "symtable.h" // st_foreach etc.
+
+/* Forward declaration: implemented at the end of this file. */
+int semantic_pass2(semantic *table, ast syntax_tree);
 
 /* =========================================================================
  *                  Small numeric helper (no snprintf)
@@ -528,13 +537,6 @@ static bool is_magic_global_identifier(const char *identifier_name) {
 }
 
 /**
- * @brief True if qname starts with "Ifj." (built-in namespace).
- */
-static bool is_builtin_qualified_name(const char *qualified_name) {
-    return qualified_name && strncmp(qualified_name, "Ifj.", 4) == 0;
-}
-
-/**
  * @brief True if there exists an accessor (getter/setter) with given base name.
  */
 static bool sem_has_accessor(semantic *semantic_table,
@@ -657,7 +659,7 @@ static int function_table_insert_signature(semantic *semantic_table,
 
     // For user-defined functions, also insert a sentinel "@name" to mark
     // that some overload for this base name exists (used for ERR_ARGNUM).
-    if (function_name && !is_builtin_qualified_name(function_name)) {
+    if (function_name && !builtins_is_builtin_qname(function_name)) {
         char any_key[256];
         make_function_any_key(any_key, sizeof any_key, function_name);
 
@@ -777,6 +779,10 @@ static int check_and_mark_main_function(semantic *semantic_table,
 static bool function_table_has_signature(semantic *semantic_table,
                                          const char *function_name,
                                          int arity) {
+    if (!semantic_table || !semantic_table->funcs || !function_name) {
+        return false;
+    }
+
     char function_key[256];
     make_function_key(function_key, sizeof function_key, function_name, arity);
     return st_find(semantic_table->funcs, (char *)function_key) != NULL;
@@ -798,8 +804,8 @@ static bool function_table_has_any_overload(semantic *semantic_table,
 }
 
 /**
- * @brief Arity checks for a call:
- *        - Built-ins: NOT validated here in Pass-1 (deferred / handled elsewhere).
+ * @brief Arity checks for a user function call (built-ins řešíme zvlášť).
+ *
  *        - User: if exact header exists, OK; if other arities exist -> ERR_ARGNUM;
  *                otherwise defer to Pass 2.
  */
@@ -809,20 +815,6 @@ static int check_function_call_arity(semantic *semantic_table,
     fprintf(stdout, "[sem] call: %s(arity=%d)\n",
             function_name ? function_name : "(null)", arity);
     if (!function_name) {
-        return SUCCESS;
-    }
-
-    /* Built-in functions (Ifj.*)
-     *
-     * In Pass-1 we do NOT enforce arity for built-ins here. Their detailed
-     * checks (including ERR_ARGNUM for bad usage) are delegated to later
-     * phases / dedicated built-in handling. This avoids false ERR_ARGNUM=5
-     * for nested expression calls where the AST does not carry a full
-     * parameter list.
-     */
-    if (is_builtin_qualified_name(function_name)) {
-        (void)semantic_table;
-        (void)arity;
         return SUCCESS;
     }
 
@@ -936,6 +928,164 @@ static int sem_check_literal_binary(int op,
     return SUCCESS;
 }
 
+/* -------------------------------------------------------------------------
+ *                Built-in function calls (Ifj.*) – Pass 1 arity+types
+ * ------------------------------------------------------------------------- */
+
+typedef enum {
+    PARAM_KIND_UNKNOWN = 0,
+    PARAM_KIND_STRING_LITERAL,
+    PARAM_KIND_NUMERIC_LITERAL
+} param_kind;
+
+/**
+ * @brief Základní klasifikace argumentu built-inu podle literálu.
+ *
+ *  - string literal -> PARAM_KIND_STRING_LITERAL
+ *  - int/float literal -> PARAM_KIND_NUMERIC_LITERAL
+ *  - cokoliv jiného (identifier, null, složitější výraz) -> PARAM_KIND_UNKNOWN
+ */
+static param_kind sem_get_param_literal_kind(ast_parameter param) {
+    if (!param) {
+        return PARAM_KIND_UNKNOWN;
+    }
+
+    switch (param->value_type) {
+        case AST_VALUE_STRING:
+            return PARAM_KIND_STRING_LITERAL;
+        case AST_VALUE_INT:
+        case AST_VALUE_FLOAT:
+            return PARAM_KIND_NUMERIC_LITERAL;
+        default:
+            return PARAM_KIND_UNKNOWN;
+    }
+}
+
+/**
+ * @brief Basic arity + literal-type checks for selected IFJ built-ins (Ifj.*).
+ *
+ * Typové kontroly děláme jen tehdy, když je argument doslova literál (string/int/float).
+ * Pokud je argument identifier nebo složitější výraz, necháme detailní typovou
+ * kontrolu na Pass-2.
+ *
+ * Špatná arita NEBO staticky špatný typ => ERR_ARGNUM (5).
+ *
+ * Arita se čte z funkční tabulky (semantic_table->funcs), která je naplněná
+ * funkcí builtins_install() z builtins.c.
+ */
+static int sem_check_builtin_call(semantic *semantic_table,
+                                  ast_fun_call call_node) {
+    if (!semantic_table || !call_node || !call_node->name) {
+        return SUCCESS;
+    }
+
+    const char *name = call_node->name;
+    int arg_count    = count_parameters(call_node->parameters);
+
+    /* 1) Aritní kontrola přes tabulku funkcí (naplněnou builtins_install). */
+    if (!function_table_has_signature(semantic_table, name, arg_count)) {
+        return error(ERR_ARGNUM,
+                     "wrong number of arguments for builtin %s (arity=%d)",
+                     name, arg_count);
+    }
+
+    /* 2) Volitelná kontrola typů literálů pro vybrané builtiny.
+     *    (Pouze pokud je argument doslova literál – jinak necháme na Pass-2.)
+     */
+    ast_parameter p1 = call_node->parameters;
+    ast_parameter p2 = p1 ? p1->next : NULL;
+    ast_parameter p3 = p2 ? p2->next : NULL;
+
+    /* floor(num) */
+    if (strcmp(name, "Ifj.floor") == 0) {
+        param_kind k1 = sem_get_param_literal_kind(p1);
+        if (k1 != PARAM_KIND_UNKNOWN && k1 != PARAM_KIND_NUMERIC_LITERAL) {
+            return error(ERR_ARGNUM,
+                         "wrong literal type for builtin Ifj.floor");
+        }
+        return SUCCESS;
+    }
+
+    /* length(string) */
+    if (strcmp(name, "Ifj.length") == 0) {
+        param_kind k1 = sem_get_param_literal_kind(p1);
+        if (k1 != PARAM_KIND_UNKNOWN && k1 != PARAM_KIND_STRING_LITERAL) {
+            return error(ERR_ARGNUM,
+                         "wrong literal type for builtin Ifj.length");
+        }
+        return SUCCESS;
+    }
+
+    /* substring(string, int, int) */
+    if (strcmp(name, "Ifj.substring") == 0) {
+        param_kind k1 = sem_get_param_literal_kind(p1);
+        param_kind k2 = sem_get_param_literal_kind(p2);
+        param_kind k3 = sem_get_param_literal_kind(p3);
+
+        if (k1 != PARAM_KIND_UNKNOWN && k1 != PARAM_KIND_STRING_LITERAL) {
+            return error(ERR_ARGNUM,
+                         "wrong literal type for builtin Ifj.substring(arg1)");
+        }
+        if (k2 != PARAM_KIND_UNKNOWN && k2 != PARAM_KIND_NUMERIC_LITERAL) {
+            return error(ERR_ARGNUM,
+                         "wrong literal type for builtin Ifj.substring(arg2)");
+        }
+        if (k3 != PARAM_KIND_UNKNOWN && k3 != PARAM_KIND_NUMERIC_LITERAL) {
+            return error(ERR_ARGNUM,
+                         "wrong literal type for builtin Ifj.substring(arg3)");
+        }
+        return SUCCESS;
+    }
+
+    /* strcmp(string, string) */
+    if (strcmp(name, "Ifj.strcmp") == 0) {
+        param_kind k1 = sem_get_param_literal_kind(p1);
+        param_kind k2 = sem_get_param_literal_kind(p2);
+
+        if (k1 != PARAM_KIND_UNKNOWN && k1 != PARAM_KIND_STRING_LITERAL) {
+            return error(ERR_ARGNUM,
+                         "wrong literal type for builtin Ifj.strcmp(arg1)");
+        }
+        if (k2 != PARAM_KIND_UNKNOWN && k2 != PARAM_KIND_STRING_LITERAL) {
+            return error(ERR_ARGNUM,
+                         "wrong literal type for builtin Ifj.strcmp(arg2)");
+        }
+        return SUCCESS;
+    }
+
+    /* ord(string, int) */
+    if (strcmp(name, "Ifj.ord") == 0) {
+        param_kind k1 = sem_get_param_literal_kind(p1);
+        param_kind k2 = sem_get_param_literal_kind(p2);
+
+        if (k1 != PARAM_KIND_UNKNOWN && k1 != PARAM_KIND_STRING_LITERAL) {
+            return error(ERR_ARGNUM,
+                         "wrong literal type for builtin Ifj.ord(arg1)");
+        }
+        if (k2 != PARAM_KIND_UNKNOWN && k2 != PARAM_KIND_NUMERIC_LITERAL) {
+            return error(ERR_ARGNUM,
+                         "wrong literal type for builtin Ifj.ord(arg2)");
+        }
+        return SUCCESS;
+    }
+
+    /* chr(int) */
+    if (strcmp(name, "Ifj.chr") == 0) {
+        param_kind k1 = sem_get_param_literal_kind(p1);
+
+        if (k1 != PARAM_KIND_UNKNOWN && k1 != PARAM_KIND_NUMERIC_LITERAL) {
+            return error(ERR_ARGNUM,
+                         "wrong literal type for builtin Ifj.chr");
+        }
+        return SUCCESS;
+    }
+
+    /* Ostatní Ifj.* builtiny – v Pass-1 jen arita přes tabulku,
+     * typově (a existence) se dořeší v Pass-2.
+     */
+    return SUCCESS;
+}
+
 /**
  * @brief Visit a function-call expression node (AST_FUNCTION_CALL).
  */
@@ -946,9 +1096,14 @@ static int sem_visit_call_expr(semantic *semantic_table,
     }
 
     ast_fun_call call_node = expression_node->operands.function_call;
-
     const char *called_name = call_node->name;
-    int parameter_count     = count_parameters(call_node->parameters);
+
+    if (builtins_is_builtin_qname(called_name)) {
+        // Built-in – arita + literály řeší sem_check_builtin_call(), zbytek až Pass-2
+        return sem_check_builtin_call(semantic_table, call_node);
+    }
+
+    int parameter_count = count_parameters(call_node->parameters);
 
     return check_function_call_arity(semantic_table,
                                      called_name,
@@ -1080,7 +1235,7 @@ static void sem_copy_builtins_to_symbol_table(semantic *semantic_table) {
 }
 
 /* =========================================================================
- *                       Bodies walk (scopes & nodes)
+ *                       Bodies walk (scopes & nodes) – Pass 1
  * ========================================================================= */
 
 static int visit_block_node(semantic *semantic_table, ast_block block_node);
@@ -1449,7 +1604,7 @@ static int sem_handle_setter_node(semantic *semantic_table,
 }
 
 /**
- * @brief Visit a single AST node in statement position.
+ * @brief Visit a single AST node in statement position. (Pass 1)
  */
 static int visit_statement_node(semantic *semantic_table,
                                 ast_node node) {
@@ -1553,12 +1708,17 @@ static int visit_statement_node(semantic *semantic_table,
                                             node);
 
         case AST_IFJ_FUNCTION:
-            // IFJ built-in declaration in AST – Pass 1 already has signatures from builtins_install(), body ignored.
+            // IFJ built-in declaration v AST – Pass 1 už má signatury z builtins_install(), tělo ignorujeme.
             return SUCCESS;
 
         case AST_CALL_FUNCTION: {
             ast_fun_call call_node = node->data.function_call;
             int parameter_count    = count_parameters(call_node->parameters);
+
+            if (builtins_is_builtin_qname(call_node->name)) {
+                return sem_check_builtin_call(semantic_table, call_node);
+            }
+
             return check_function_call_arity(semantic_table,
                                              call_node->name,
                                              parameter_count);
@@ -1580,7 +1740,7 @@ static int visit_statement_node(semantic *semantic_table,
 }
 
 /* =========================================================================
- *                      Header collection (recursive)
+ *                      Header collection (recursive) – Pass 1
  * ========================================================================= */
 
 /**
@@ -1910,11 +2070,11 @@ static void sem_pretty_print_symbol_table(semantic *semantic_table) {
 }
 
 /* =========================================================================
- *                              Entry point
+ *                              Entry point – Pass 1
  * ========================================================================= */
 
 /**
- * @brief Run the first semantic pass over the AST.
+ * @brief Run the first semantic pass over the AST, then Pass 2.
  */
 int semantic_pass1(ast syntax_tree) {
     semantic semantic_table;
@@ -1955,8 +2115,10 @@ int semantic_pass1(ast syntax_tree) {
     }
     fprintf(stdout, "[sem] built-ins seeded.\n");
 
+    /* Zkopírujeme builtiny do symtab (scope=global) pro účely výpisu. */
     sem_copy_builtins_to_symbol_table(&semantic_table);
 
+    /* 1. průchod – hlavičky funkcí / getterů / setterů */
     int result_code =
         collect_headers(&semantic_table, syntax_tree);
     if (result_code != SUCCESS) {
@@ -1973,7 +2135,7 @@ int semantic_pass1(ast syntax_tree) {
         return rc;
     }
 
-    // Walk all class root blocks
+    /* 2. část Pass-1 – walk přes těla programů/funkcí */
     for (ast_class class_node = syntax_tree->class_list;
          class_node;
          class_node = class_node->next) {
@@ -1992,15 +2154,17 @@ int semantic_pass1(ast syntax_tree) {
         }
     }
 
-    // Final symbol table dump
+    // Final symbol table dump after Pass-1
     sem_pretty_print_symbol_table(&semantic_table);
-    semantic_pass2(&semantic_table,syntax_tree);
+
+    // Run Pass-2 (identifier + call resolution) with the same semantic_table.
+    int pass2_result = semantic_pass2(&semantic_table, syntax_tree);
+
     st_free(semantic_table.funcs);
     st_free(semantic_table.symtab);
 
-    return SUCCESS;
+    return pass2_result;
 }
-
 
 /* =========================================================================
  *                              Pass 2
@@ -2077,7 +2241,7 @@ static int sem2_check_function_call(semantic *cxt,
     }
 
     /* Builtins */
-    if (is_builtin_qualified_name(name)) {
+    if (builtins_is_builtin_qname(name)) {
         char key[256];
         make_function_key(key, sizeof key, name, arity);
 
@@ -2170,11 +2334,12 @@ static int sem2_visit_expr(semantic *cxt, ast_expression e)
         case AST_EQUALS: case AST_NOT_EQUAL:
         case AST_LT: case AST_LE: case AST_GT: case AST_GE:
         case AST_AND: case AST_OR:
-        case AST_TERNARY: case AST_IS: case AST_CONCAT:
+        case AST_TERNARY: case AST_IS: case AST_CONCAT: {
             printf("[sem2][EXPR] → binary\n");
-            if (sem2_visit_expr(cxt, e->operands.binary_op.left) != SUCCESS)
-                return ERR_INTERNAL;
+            int rc = sem2_visit_expr(cxt, e->operands.binary_op.left);
+            if (rc != SUCCESS) return rc;
             return sem2_visit_expr(cxt, e->operands.binary_op.right);
+        }
 
         case AST_NONE:
         case AST_NIL:
@@ -2230,45 +2395,49 @@ static int sem2_visit_statement_node(semantic *table, ast_node node)
         case AST_VAR_DECLARATION: {
             const char *name = node->data.declaration.name;
             printf("[sem2] DECLARE var '%s' (scope=%s)\n",
-                name,
-                sem_scope_ids_current(&table->ids));
+                   name,
+                   sem_scope_ids_current(&table->ids));
 
             // Insert variable into the current scope, same as Pass 1
             if (!scopes_declare_local(&table->scopes, name, true)) {
                 return error(ERR_REDEF,
-                            "variable '%s' already declared in this scope",
-                            name);
+                             "variable '%s' already declared in this scope",
+                             name);
             }
-        return SUCCESS;
-}
-
+            return SUCCESS;
+        }
 
         case AST_ASSIGNMENT: {
             const char *lhs = node->data.assignment.name;
 
             printf("[sem2] ASSIGN → %s (scope=%s)\n",
-                lhs, sem_scope_ids_current(&table->ids));
+                   lhs, sem_scope_ids_current(&table->ids));
 
             // MUST resolve LHS variable
             int rc = sem2_resolve_identifier(table, lhs);
             if (rc != SUCCESS) return rc;
 
             return sem2_visit_expr(table, node->data.assignment.value);
-}
+        }
 
         case AST_FUNCTION: {
-    // enter function scope
-    sem_scope_enter_block(table);
+            printf("[sem2][STMT] → FUNCTION\n");
 
-    // declare parameters "arg", "val", etc.
-    declare_parameter_list_in_current_scope(table, node->data.function->parameters);
+            // enter function scope
+            sem_scope_enter_block(table);
+            printf("[sem2][FUNC] scope=%s\n",
+                   sem_scope_ids_current(&table->ids));
 
-    // now visit statements of the function body
-    int rc = sem2_visit_block(table, node->data.function->code);
+            // declare parameters "arg", "val", etc.
+            declare_parameter_list_in_current_scope(table, node->data.function->parameters);
 
-    sem_scope_leave_block(table, "function body");
-    return rc;
-}
+            // now visit statements of the function body
+            int rc = sem2_visit_block(table, node->data.function->code);
+
+            sem_scope_leave_block(table, "function body");
+            return rc;
+        }
+
         case AST_GETTER:
             printf("[sem2][STMT] → GETTER\n");
             return sem2_visit_block(table, node->data.getter.body);
@@ -2277,11 +2446,24 @@ static int sem2_visit_statement_node(semantic *table, ast_node node)
             printf("[sem2][STMT] → SETTER\n");
             return sem2_visit_block(table, node->data.setter.body);
 
-        case AST_CALL_FUNCTION:
+        case AST_CALL_FUNCTION: {
             printf("[sem2][STMT] → CALL_FUNCTION\n");
             /* Same as expression call */
-            return sem2_visit_expr(table,
-                                   (ast_expression)node->data.function_call);
+            ast_fun_call call = node->data.function_call;
+            if (!call) return SUCCESS;
+            int ar = count_parameters(call->parameters);
+            int rc = sem2_check_function_call(table, call->name, ar);
+            if (rc != SUCCESS) return rc;
+
+            /* Resolve parameters identifiers */
+            for (ast_parameter p = call->parameters; p; p = p->next) {
+                if (p->value_type == AST_VALUE_IDENTIFIER) {
+                    rc = sem2_resolve_identifier(table, p->value.string_value);
+                    if (rc != SUCCESS) return rc;
+                }
+            }
+            return SUCCESS;
+        }
 
         case AST_RETURN:
             printf("[sem2][STMT] → RETURN\n");
@@ -2290,7 +2472,7 @@ static int sem2_visit_statement_node(semantic *table, ast_node node)
         case AST_BREAK:
         case AST_CONTINUE:
         case AST_IFJ_FUNCTION:
-            printf("[sem2][STMT] → BREAK/CONTINUE\n");
+            printf("[sem2][STMT] → BREAK/CONTINUE/IFJ_FUNCTION (ignored in Pass 2)\n");
             return SUCCESS;
     }
 
@@ -2339,6 +2521,9 @@ int semantic_pass2(semantic *table, ast syntax_tree)
     printf("[sem2] Starting Pass 2\n");
     printf("[sem2] =========================================\n");
 
+    /* Nová sada scope rámců a scope ID pro Pass 2. */
+    scopes_init(&table->scopes);
+    sem_scope_ids_init(&table->ids);
     table->loop_depth = 0;
 
     for (ast_class c = syntax_tree->class_list; c; c = c->next) {

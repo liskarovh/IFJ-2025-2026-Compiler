@@ -972,15 +972,33 @@ static param_kind sem_get_param_literal_kind(ast_parameter param) {
  *
  * Arita se čte z funkční tabulky (semantic_table->funcs), která je naplněná
  * funkcí builtins_install() z builtins.c.
+ *
+ * raw_name:
+ *  - buď už plně kvalifikované "Ifj.floor",
+ *  - nebo krátké "floor"/"length"/... z AST_IFJ_FUNCTION/AST_IFJ_FUNCTION_EXPR.
  */
 static int sem_check_builtin_call(semantic *semantic_table,
-                                  ast_fun_call call_node) {
-    if (!semantic_table || !call_node || !call_node->name) {
+                                  const char *raw_name,
+                                  ast_parameter parameters) {
+    if (!semantic_table || !raw_name) {
         return SUCCESS;
     }
 
-    const char *name = call_node->name;
-    int arg_count    = count_parameters(call_node->parameters);
+    const char *name = raw_name;
+    char qname_buffer[64];
+
+    /* Normalize name to "Ifj.<name>" if not already qualified. */
+    if (strncmp(raw_name, "Ifj.", 4) != 0) {
+        size_t base_len = strlen(raw_name);
+        if (base_len + 4 < sizeof qname_buffer) {
+            memcpy(qname_buffer, "Ifj.", 4);
+            memcpy(qname_buffer + 4, raw_name, base_len);
+            qname_buffer[4 + base_len] = '\0';
+            name = qname_buffer;
+        }
+    }
+
+    int arg_count = count_parameters(parameters);
 
     /* 1) Aritní kontrola přes tabulku funkcí (naplněnou builtins_install). */
     if (!function_table_has_signature(semantic_table, name, arg_count)) {
@@ -989,10 +1007,10 @@ static int sem_check_builtin_call(semantic *semantic_table,
                      name, arg_count);
     }
 
-    /* 2) Volitelná kontrola typů literálů pro vybrané builtiny.
+    /* 2) Volitelná kontrola typů literálů pro vybrané IFJ builtiny.
      *    (Pouze pokud je argument doslova literál – jinak necháme na Pass-2.)
      */
-    ast_parameter p1 = call_node->parameters;
+    ast_parameter p1 = parameters;
     ast_parameter p2 = p1 ? p1->next : NULL;
     ast_parameter p3 = p2 ? p2->next : NULL;
 
@@ -1100,7 +1118,9 @@ static int sem_visit_call_expr(semantic *semantic_table,
 
     if (builtins_is_builtin_qname(called_name)) {
         // Built-in – arita + literály řeší sem_check_builtin_call(), zbytek až Pass-2
-        return sem_check_builtin_call(semantic_table, call_node);
+        return sem_check_builtin_call(semantic_table,
+                                      called_name,
+                                      call_node->parameters);
     }
 
     int parameter_count = count_parameters(call_node->parameters);
@@ -1159,6 +1179,22 @@ static int visit_expression_node(semantic *semantic_table,
         case AST_NOT:
         case AST_NOT_NULL:
             return SUCCESS;
+
+        case AST_IFJ_FUNCTION_EXPR: {
+            ast_ifj_function ifj_call = expression_node->operands.ifj_function;
+            if (!ifj_call || !ifj_call->name) {
+                return SUCCESS;
+            }
+
+            fprintf(stdout,
+                    "[sem] IFJ expr call: %s (scope=%s)\n",
+                    ifj_call->name,
+                    sem_scope_ids_current(&semantic_table->ids));
+
+            return sem_check_builtin_call(semantic_table,
+                                          ifj_call->name,
+                                          ifj_call->parameters);
+        }
 
         case AST_FUNCTION_CALL:
             return sem_visit_call_expr(semantic_table, expression_node);
@@ -1707,16 +1743,30 @@ static int visit_statement_node(semantic *semantic_table,
             return sem_handle_function_node(semantic_table,
                                             node);
 
-        case AST_IFJ_FUNCTION:
-            // IFJ built-in declaration v AST – Pass 1 už má signatury z builtins_install(), tělo ignorujeme.
-            return SUCCESS;
+        case AST_IFJ_FUNCTION: {
+            ast_ifj_function ifj_call = node->data.ifj_function;
+            if (!ifj_call || !ifj_call->name) {
+                return SUCCESS;
+            }
+
+            fprintf(stdout,
+                    "[sem] IFJ stmt call: %s (scope=%s)\n",
+                    ifj_call->name,
+                    sem_scope_ids_current(&semantic_table->ids));
+
+            return sem_check_builtin_call(semantic_table,
+                                          ifj_call->name,
+                                          ifj_call->parameters);
+        }
 
         case AST_CALL_FUNCTION: {
             ast_fun_call call_node = node->data.function_call;
             int parameter_count    = count_parameters(call_node->parameters);
 
             if (builtins_is_builtin_qname(call_node->name)) {
-                return sem_check_builtin_call(semantic_table, call_node);
+                return sem_check_builtin_call(semantic_table,
+                                              call_node->name,
+                                              call_node->parameters);
             }
 
             return check_function_call_arity(semantic_table,
@@ -2324,6 +2374,47 @@ static int sem2_visit_expr(semantic *cxt, ast_expression e)
             return SUCCESS;
         }
 
+        case AST_IFJ_FUNCTION_EXPR: {
+            ast_ifj_function call = e->operands.ifj_function;
+            if (!call) {
+                printf("[sem2][EXPR] → IFJ FUNCTION (null)\n");
+                return SUCCESS;
+            }
+
+            int ar = count_parameters(call->parameters);
+
+            char qname[128];
+            const char *name = call->name ? call->name : "(null)";
+
+            if (call->name) {
+                size_t len = strlen(call->name);
+                if (len + 4 < sizeof qname) {
+                    memcpy(qname, "Ifj.", 4);
+                    memcpy(qname + 4, call->name, len);
+                    qname[4 + len] = '\0';
+                    name = qname;
+                }
+            }
+
+            printf("[sem2][EXPR] → IFJ FUNCTION '%s' arity=%d\n",
+                   name, ar);
+
+            int rc = sem2_check_function_call(cxt, name, ar);
+            if (rc != SUCCESS) return rc;
+
+            /* resolve identifier parameters */
+            for (ast_parameter p = call->parameters; p; p = p->next) {
+                printf("[sem2][EXPR] → IFJ param value_type=%d\n",
+                       p->value_type);
+                if (p->value_type == AST_VALUE_IDENTIFIER) {
+                    rc = sem2_resolve_identifier(cxt, p->value.string_value);
+                    if (rc != SUCCESS) return rc;
+                }
+            }
+
+            return SUCCESS;
+        }
+
         case AST_NOT:
         case AST_NOT_NULL:
             printf("[sem2][EXPR] → unary\n");
@@ -2471,9 +2562,41 @@ static int sem2_visit_statement_node(semantic *table, ast_node node)
 
         case AST_BREAK:
         case AST_CONTINUE:
-        case AST_IFJ_FUNCTION:
-            printf("[sem2][STMT] → BREAK/CONTINUE/IFJ_FUNCTION (ignored in Pass 2)\n");
+            printf("[sem2][STMT] → BREAK/CONTINUE (ignored in Pass 2)\n");
             return SUCCESS;
+
+        case AST_IFJ_FUNCTION: {
+            printf("[sem2][STMT] → IFJ_FUNCTION\n");
+            ast_ifj_function call = node->data.ifj_function;
+            if (!call) return SUCCESS;
+
+            int ar = count_parameters(call->parameters);
+
+            char qname[128];
+            const char *name = call->name ? call->name : "(null)";
+
+            if (call->name) {
+                size_t len = strlen(call->name);
+                if (len + 4 < sizeof qname) {
+                    memcpy(qname, "Ifj.", 4);
+                    memcpy(qname + 4, call->name, len);
+                    qname[4 + len] = '\0';
+                    name = qname;
+                }
+            }
+
+            int rc = sem2_check_function_call(table, name, ar);
+            if (rc != SUCCESS) return rc;
+
+            /* Resolve identifier arguments */
+            for (ast_parameter p = call->parameters; p; p = p->next) {
+                if (p->value_type == AST_VALUE_IDENTIFIER) {
+                    rc = sem2_resolve_identifier(table, p->value.string_value);
+                    if (rc != SUCCESS) return rc;
+                }
+            }
+            return SUCCESS;
+        }
     }
 
     printf("[sem2][STMT] → unhandled\n");

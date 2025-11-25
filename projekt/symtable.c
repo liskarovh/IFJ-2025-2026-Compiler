@@ -84,12 +84,17 @@ void st_insert(symtable *table,char *key, symbol_type type, bool defined){
 
     place->occupied = true;
     place->deleted = false;
+
     place->data->symbol_type = type;
-    place->data->defined = defined;
-    table->size++;
+    place->data->defined     = defined;
     place->data->param_count = 0;
+    place->data->data_type   = ST_NULL;
+    place->data->global      = false;
+    place->data->ID          = NULL;
+    place->data->params      = NULL;
+    place->data->scope_name  = NULL;
 
-
+    table->size++;
 }
 
 st_data *st_get(symtable *table, char *key){
@@ -135,7 +140,7 @@ void st_dump(symtable *table, FILE *out) {
         if (key && strncmp(key, "get:", 4) == 0) { acc = "getter"; base = key + 4; }
         else if (key && strncmp(key, "set:", 4) == 0) { acc = "setter"; base = key + 4; }
 
-        // základ řádku
+
         fprintf(out, "[%05d] key=%-24s kind=%d", i, key, kind);
         if (data && (data->symbol_type == ST_FUN ||
              data->symbol_type == ST_GETTER ||
@@ -144,7 +149,7 @@ void st_dump(symtable *table, FILE *out) {
         }
 
 
-        // scope (váš string)
+
         if (data && data->scope_name) {
             fputs(" scope=", out);
             if (data->scope_name->data && data->scope_name->length) {
@@ -154,7 +159,7 @@ void st_dump(symtable *table, FILE *out) {
             }
         }
 
-        // accessory: base + value (value = st_data->ID, jinak první parametr)
+
         if (acc && base) {
             fprintf(out, " accessor=%s base=%s", acc, base);
 
@@ -177,10 +182,7 @@ void st_dump(symtable *table, FILE *out) {
     fprintf(out, "-- end dump --\n");
 }
 
-/**
- * @brief Iterace přes všechny obsazené záznamy tabulky.
- *        Pro každý prvek zavolá cb(key, data, user_data).
- */
+
 void st_foreach(symtable *table, st_iter_cb cb, void *user_data) {
     if (!table || !cb) return;
 

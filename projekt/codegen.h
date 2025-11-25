@@ -5,7 +5,6 @@
  * 
  * Code generator implementation using Syntactic tree
  * BUT FIT
- * IFJ24
  */
 
 #ifndef IFJ_CODE_GEN
@@ -25,7 +24,7 @@ enum arity{
     ARITY_UNDEFINED
 };
 
-void init_code(generator gen, ASTBodyPtr syntree);
-void generate_code(generator gen, ASTBodyPtr syntree);
+void init_code(generator gen, ast syntree);
+void generate_code(generator gen, ast syntree);
 
 #endif

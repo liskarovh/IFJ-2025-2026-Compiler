@@ -5,7 +5,6 @@
  * 
  * Code generator implementation using Syntactic tree
  * BUT FIT
- * IFJ24
  */
 #include <stdio.h>
 #include <string.h>
@@ -14,29 +13,214 @@
 #include "codegen.h"
 #include "error.h"
 #include "string.h"
+#include "stack.h"
 
 
-void generate_unary(generator gen, char * result, ASTNodePtr node);
-void generate_binary(generator gen, char * result, ASTNodePtr node);
-void generate_expression(generator gen, char * result, ASTNodePtr node);
-void generate_function_call(generator gen, ASTNodePtr function);
-void generate_assignment(generator gen, ASTNodePtr node);
-void generate_declaration(generator gen, ASTNodePtr node);
-void generate_if_statement(generator gen, ASTNodePtr node);
-void generate_node(ASTNodePtr node, generator gen);
-void init_code(generator gen, ASTBodyPtr syntree);
-void generate_code(generator gen, ASTBodyPtr syntree);
-void generate_function(generator gen, ASTNodePtr node);
+void generate_unary(generator gen, char * result, ast_expression node);
+void generate_binary(generator gen, char * result, ast_expression node);
+void generate_expression(generator gen, char * result, ast_expression node);
+void generate_function_call(generator gen, ast_node node, ast_expression expr_node);
+void generate_assignment(generator gen, ast_node node);
+void generate_declaration(generator gen, ast_node node);
+void generate_if_statement(generator gen, ast_node node);
+void generate_node(ast_node node, generator gen);
+void init_code(generator gen, ast syntree);
+void generate_code(generator gen, ast syntree);
+void generate_function(generator gen, ast_node node);
+void generate_block(generator gen, ast_block block);
+void generate_ifjfunction(generator gen, char* name, ast_parameter params, char* output);
 
 
-void locToLable(string lable){
-    string new = string_create(10);
-    for(int i = 3; i <= lable->length; i++){
-        string_append_char(new, lable->data[i]);
+const char *PREFIXES[] = {
+    "int@", 
+    "float@", 
+    "string@",
+    "GF@",
+    "LF@",
+    "nil@",
+    "bool@",
+    NULL // Ukončovací prvek pole
+};
+
+/**
+ * @brief Kontroluje, zda řetězec 'str' začíná některým z prefixů v poli 'prefixes'.
+ *
+ * @param str Řetězec ke kontrole.
+ * @param prefixes Pole zakázaných prefixů (ukončené NULL).
+ * @return 1, pokud řetězec začíná zakázaným prefixem, jinak 0.
+ */
+int starts_with_prefix(const char *str, const char **prefixes) {
+    if (str == NULL) {
+        return 0;
     }
-    string_clear(lable);
-    string_append_literal(lable, new->data);
-    string_destroy(new);
+    for (int i = 0; prefixes[i] != NULL; i++) {
+        size_t len = strlen(prefixes[i]);
+        if (strncmp(str, prefixes[i], len) == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/**
+ * @brief Parsuje název proměnné, přidává prefix rámce a ověřuje zakázané prefixy.
+ *
+ * @param var Původní název proměnné.
+ * @return Nově alokovaný řetězec ve formátu FRAME@var, nebo NULL při chybě/neplatném vstupu.
+ */
+char* var_frame_parse(char *var) {
+    if (var == NULL) {
+        fprintf(stderr, "Chyba: Vstupní proměnná je NULL.\n");
+        return NULL;
+    }
+
+    const char *prefix;
+
+    if (starts_with_prefix(var, PREFIXES)) { // kontrola, zda nen9 prefix
+        prefix = "";
+    }
+    else if (var[0] == '_' && var[1] == '_') {
+        prefix = "GF@";
+    } else {
+        prefix = "LF@";
+    }
+
+    size_t prefix_len = strlen(prefix);
+    size_t var_len = strlen(var);
+    
+    char *varout = (char*)malloc(prefix_len + var_len + 1);
+    
+    if (varout == NULL) {
+        fprintf(stderr, "Chyba alokace paměti.\n");
+        return NULL;
+    }
+
+    strcpy(varout, prefix);
+    strcat(varout, var);
+    
+    return varout;
+}
+
+char* escape_string_literal(const char* original_str) {
+    if (original_str == NULL) { // prázdný řetězec
+        char* prefix_only = malloc(7 * sizeof(char));
+        if (prefix_only) prefix_only = "string@";
+        return prefix_only;
+    }
+
+    size_t len = strlen(original_str);
+    size_t max_size = 7 + len * 4 + 1;
+
+    char* result = (char*)malloc(max_size);
+    if (result == NULL) {
+        return NULL;
+    }
+
+    strcpy(result, "string@");
+    char* current = result + 7; // zapisování za prefixem
+
+    for (size_t i = 0; i < len; i++) {
+        unsigned char ch = (unsigned char)original_str[i];
+
+        // escapování \xyz pro 0-32, 35 (#) a 92 (\)
+        if (ch <= 32 || ch == 35 || ch == 92) {
+            current += sprintf(current, "\\%03d", ch); 
+        } 
+        else {
+            *current++ = ch;
+        }
+    }
+    
+    *current = '\0';
+
+    return result;
+}
+
+char *ast_value_to_string(ast_expression expr_node, ast_parameter param_node) {
+    char *result = NULL;
+    ast_value_type type;
+    int int_val;
+    float float_val;
+    char *char_val;
+    if(expr_node) {
+        if(expr_node->type == AST_IDENTIFIER) {
+            char_val = expr_node->operands.identifier.value;
+            type = AST_VALUE_IDENTIFIER;
+        }
+        else {
+            type = expr_node->operands.identity.value_type;
+            switch (type) {
+            case AST_VALUE_INT:
+                int_val = expr_node->operands.identity.value.int_value;
+                break;
+            case AST_VALUE_FLOAT:
+                float_val = expr_node->operands.identity.value.double_value;
+                break;
+            case AST_VALUE_NULL:
+                break;
+            case AST_VALUE_IDENTIFIER:
+                char_val = expr_node->operands.identifier.value;
+                break;
+            default:
+                char_val = expr_node->operands.identity.value.string_value;
+                if (strcmp(char_val, "Num") == 0)
+                    char_val = "string@int";
+                else if (strcmp(char_val, "String") == 0)
+                    char_val = "string@string";
+                else if (strcmp(char_val, "Null") == 0)
+                    char_val = "string@nil";
+                break;
+            }
+        }
+    }
+    else{
+        type = param_node->value_type;
+        switch (type) {
+        case AST_VALUE_INT:
+            int_val = param_node->value.int_value;
+            break;
+        case AST_VALUE_FLOAT:
+            float_val = param_node->value.double_value;
+            break;
+        case AST_VALUE_NULL:
+            break;
+        default:
+            char_val = param_node->value.string_value;
+            break;
+        }
+    }
+    switch (type) {
+        case AST_VALUE_INT:
+            result = malloc((12 + 4) * sizeof(char));
+            if (result) {
+                sprintf(result, "int@%d", int_val);
+            }
+            break;
+        
+        case AST_VALUE_FLOAT:
+            result = malloc((64 + 6) * sizeof(char));
+            if (result) {
+                sprintf(result, "float@%a", float_val);
+            }
+            break;
+        
+        case AST_VALUE_IDENTIFIER:
+            result = var_frame_parse(char_val);
+            break;
+
+        case AST_VALUE_STRING:
+            result = escape_string_literal(char_val);
+            break;
+
+        case AST_VALUE_NULL:
+            result = malloc((8) * sizeof(char));
+            result = "nil@nil";
+            break;
+        
+        default:
+            return NULL;
+    }
+    return result;
 }
 
 enum arity get_op_arity(ast_expression_type type){
@@ -54,13 +238,27 @@ enum arity get_op_arity(ast_expression_type type){
         case AST_GE:
         case AST_AND:
         case AST_OR:
-        case AST_CONCAT: //concat
+        case AST_IS:
+        case AST_CONCAT:
             return ARITY_BINARY;
         case AST_NOT:
             return ARITY_UNARY;
         default:
             return ARITY_UNDEFINED;
     }
+}
+
+char* generate_temp_var(generator gen) {
+    size_t size = 16 + 10; 
+    char *tmp_name = (char*)malloc(size);
+
+    if (tmp_name == NULL) {
+        fprintf(stderr, "Chyba alokace paměti pro dočasnou proměnnou.\n");
+        exit(ERR_INTERNAL); 
+    }
+    snprintf(tmp_name, size, "LF@expr_res_%u", gen->counter++);
+    
+    return tmp_name;
 }
 
 void create_gen(generator gen){
@@ -96,54 +294,78 @@ void jump(generator gen, char * label){
     string_append_literal(gen->output, "\n");
 }
 void add_jumpifeq(generator gen, char * label, char * symb1, char * symb2){
+    char *nsymb1 = var_frame_parse(symb1);
+    char *nsymb2 = var_frame_parse(symb2);
     string_append_literal(gen->output, "JUMPIFEQ ");
     string_append_literal(gen->output, label);
     string_append_literal(gen->output, " ");
-    string_append_literal(gen->output, symb1);
+    string_append_literal(gen->output, nsymb1);
     string_append_literal(gen->output, " ");
-    string_append_literal(gen->output, symb2);
+    string_append_literal(gen->output, nsymb2);
     string_append_literal(gen->output, "\n");
+    free(nsymb1);
+    free(nsymb2);
 }
 void add_jumpifneq(generator gen, char * label, char * symb1, char * symb2){
+    char *nsymb1 = var_frame_parse(symb1);
+    char *nsymb2 = var_frame_parse(symb2);
     string_append_literal(gen->output, "JUMPIFNEQ ");
     string_append_literal(gen->output, label);
     string_append_literal(gen->output, " ");
-    string_append_literal(gen->output, symb1);
+    string_append_literal(gen->output, nsymb1);
     string_append_literal(gen->output, " ");
-    string_append_literal(gen->output, symb2);
+    string_append_literal(gen->output, nsymb2);
     string_append_literal(gen->output, "\n");
+    free(nsymb1);
+    free(nsymb2);
 }
 void push(generator gen, char * name){
+    char *nname = var_frame_parse(name);
     string_append_literal(gen->output, "PUSHS ");
-    string_append_literal(gen->output, name);
+    string_append_literal(gen->output, nname);
     string_append_literal(gen->output, "\n");
+    free(nname);
 }
 void pop(generator gen, char * name){
+    char *nname = var_frame_parse(name);
     string_append_literal(gen->output, "POPS ");
-    string_append_literal(gen->output, name);
+    string_append_literal(gen->output, nname);
     string_append_literal(gen->output, "\n");
+    free(nname);
 }
 void define_variable(generator gen, char * name){
+    char *nname = var_frame_parse(name);
     string_append_literal(gen->output, "DEFVAR ");
-    string_append_literal(gen->output, name);
+    string_append_literal(gen->output, nname);
     string_append_literal(gen->output, "\n");
+    free(nname);
 }
 void move_var(generator gen, char * var1, char * var2){
+    char *nvar1 = var_frame_parse(var1);
+    char *nvar2 = var_frame_parse(var2);
     string_append_literal(gen->output, "MOVE ");
-    string_append_literal(gen->output, var1);
+    string_append_literal(gen->output, nvar1);
     string_append_literal(gen->output, " ");
-    string_append_literal(gen->output, var2);
+    string_append_literal(gen->output, nvar2);
     string_append_literal(gen->output, "\n");
+    free(nvar1);
+    free(nvar2);
 }
 void binary_operation(generator gen, char * op, char * result, char * left, char * right){
+    char *nresult = var_frame_parse(result);
+    char *nleft = var_frame_parse(left);
+    char *nright = var_frame_parse(right);
     string_append_literal(gen->output, op);
     string_append_literal(gen->output, " ");
-    string_append_literal(gen->output, result);
+    string_append_literal(gen->output, nresult);
     string_append_literal(gen->output, " ");
-    string_append_literal(gen->output, left);
+    string_append_literal(gen->output, nleft);
     string_append_literal(gen->output, " ");
-    string_append_literal(gen->output, right);
+    string_append_literal(gen->output, nright);
     string_append_literal(gen->output, "\n");
+    free(nresult);
+    free(nleft);
+    free(nright);
 }
 void op_add(generator gen, char * result, char * left, char * right){
     binary_operation(gen, "ADD", result, left, right);
@@ -179,83 +401,143 @@ void op_concat(generator gen, char * result, char * left, char * right){
     binary_operation(gen, "CONCAT", result, left, right);
 }
 void op_not(generator gen, char * result, char * op){
+    char *nresult = var_frame_parse(result);
     string_append_literal(gen->output, "NOT ");
-    string_append_literal(gen->output, result);
+    string_append_literal(gen->output, nresult);
     string_append_literal(gen->output, " ");
     string_append_literal(gen->output, op);
     string_append_literal(gen->output, "\n");
+    free(nresult);
 }
 void ifj_read(generator gen, char * name, char * type){
+    char *nname = var_frame_parse(name);
     string_append_literal(gen->output, "READ ");
-    string_append_literal(gen->output, name);
+    string_append_literal(gen->output, nname);
     string_append_literal(gen->output, " ");
     string_append_literal(gen->output, type);
     string_append_literal(gen->output, "\n");
+    free(nname);
 }
 void ifj_write(generator gen, char * name){
+    char *nname = var_frame_parse(name);
     string_append_literal(gen->output, "WRITE ");
-    string_append_literal(gen->output, name);
+    string_append_literal(gen->output, nname);
     string_append_literal(gen->output, "\n");
+    free(nname);
 }
 void ifj_strlen(generator gen, char * output, char * input){
+    char *noutput = var_frame_parse(output);
+    char *ninput = var_frame_parse(input);
     string_append_literal(gen->output, "STRLEN ");
-    string_append_literal(gen->output, output);
+    string_append_literal(gen->output, noutput);
     string_append_literal(gen->output, " ");
-    string_append_literal(gen->output, input);
+    string_append_literal(gen->output, ninput);
     string_append_literal(gen->output, "\n");
+    free(ninput);
+    free(noutput);
 }
 void ifj_getchar(generator gen, char * output, char * input, char * position){
-    string_append_literal(gen->output, "GATCHAR ");
-    string_append_literal(gen->output, output);
+    char *ninput = var_frame_parse(input);
+    char *noutput = var_frame_parse(output);
+    string_append_literal(gen->output, "GETCHAR ");
+    string_append_literal(gen->output, noutput);
     string_append_literal(gen->output, " ");
-    string_append_literal(gen->output, input);
+    string_append_literal(gen->output, ninput);
     string_append_literal(gen->output, " ");
     string_append_literal(gen->output, position);
     string_append_literal(gen->output, "\n");
+    free(ninput);
+    free(noutput);
 }
-void IFJ_setchar(generator gen, char * output, char * position, char * input){
+void ifj_setchar(generator gen, char * output, char * position, char * input){
+    char *noutput = var_frame_parse(output);
+    char *ninput = var_frame_parse(input);
     string_append_literal(gen->output, "SETCHAR ");
-    string_append_literal(gen->output, output);
+    string_append_literal(gen->output, noutput);
     string_append_literal(gen->output, " ");
     string_append_literal(gen->output, position);
     string_append_literal(gen->output, " ");
-    string_append_literal(gen->output, input);
+    string_append_literal(gen->output, ninput);
     string_append_literal(gen->output, "\n");
+    free(ninput);
+    free(noutput);
 }
-void IFJ_type(generator gen, char * output, char * input){
+void ifj_type(generator gen, char * output, char * input){
+    char *ninput = var_frame_parse(input);
+    char *noutput = var_frame_parse(output);
     string_append_literal(gen->output, "TYPE ");
-    string_append_literal(gen->output, output);
+    string_append_literal(gen->output, noutput);
     string_append_literal(gen->output, " ");
-    string_append_literal(gen->output, input);
+    string_append_literal(gen->output, ninput);
     string_append_literal(gen->output, "\n");
+    free(ninput);
+    free(noutput);
 }
-void IFJ_float2int(generator gen, char * output, char * input){
+void ifj_float2int(generator gen, char * output, char * input){
+    char *ninput = var_frame_parse(input);
+    char *noutput = var_frame_parse(output);
     string_append_literal(gen->output, "FLOAT2INT ");
-    string_append_literal(gen->output, output);
+    string_append_literal(gen->output, noutput);
     string_append_literal(gen->output, " ");
-    string_append_literal(gen->output, input);
+    string_append_literal(gen->output, ninput);
     string_append_literal(gen->output, "\n");
+    free(ninput);
+    free(noutput);
 }
-void IFJ_int2char(generator gen, char * output, char * input){
+void ifj_int2char(generator gen, char * output, char * input){
+    char *ninput = var_frame_parse(input);
+    char *noutput = var_frame_parse(output);
     string_append_literal(gen->output, "INT2CHAR ");
-    string_append_literal(gen->output, output);
+    string_append_literal(gen->output, noutput);
     string_append_literal(gen->output, " ");
-    string_append_literal(gen->output, input);
+    string_append_literal(gen->output, ninput);
     string_append_literal(gen->output, "\n");
+    free(ninput);
+    free(noutput);
 }
-void IFJ_stri2int(generator gen, char * output, char * input){
-    string_append_literal(gen->output, "STRING2INT ");
-    string_append_literal(gen->output, output);
+void ifj_int2str(generator gen, char * output, char * input){
+    char *ninput = var_frame_parse(input);
+    char *noutput = var_frame_parse(output);
+    string_append_literal(gen->output, "INT2STR ");
+    string_append_literal(gen->output, noutput);
     string_append_literal(gen->output, " ");
-    string_append_literal(gen->output, input);
+    string_append_literal(gen->output, ninput);
     string_append_literal(gen->output, "\n");
+    free(ninput);
+    free(noutput);
 }
-void IFJ_int2float(generator gen, char * output, char * input){
+void ifj_float2str(generator gen, char * output, char * input){
+    char *ninput = var_frame_parse(input);
+    char *noutput = var_frame_parse(output);
+    string_append_literal(gen->output, "FLOAT2STR ");
+    string_append_literal(gen->output, noutput);
+    string_append_literal(gen->output, " ");
+    string_append_literal(gen->output, ninput);
+    string_append_literal(gen->output, "\n");
+    free(ninput);
+    free(noutput);
+}
+void ifj_stri2int(generator gen, char * output, char * input){
+    char *ninput = var_frame_parse(input);
+    char *noutput = var_frame_parse(output);
+    string_append_literal(gen->output, "STRI2INT ");
+    string_append_literal(gen->output, noutput);
+    string_append_literal(gen->output, " ");
+    string_append_literal(gen->output, ninput);
+    string_append_literal(gen->output, "\n");
+    free(ninput);
+    free(noutput);
+}
+void ifj_int2float(generator gen, char * output, char * input){
+    char *ninput = var_frame_parse(input);
+    char *noutput = var_frame_parse(output);
     string_append_literal(gen->output, "INT2FLOAT ");
-    string_append_literal(gen->output, output);
+    string_append_literal(gen->output, noutput);
     string_append_literal(gen->output, " ");
-    string_append_literal(gen->output, input);
+    string_append_literal(gen->output, ninput);
     string_append_literal(gen->output, "\n");
+    free(ninput);
+    free(noutput);
 }
 void exit_code(generator gen, char * code){
     string_append_literal(gen->output, "EXIT ");
@@ -269,7 +551,7 @@ void generate_unary(generator gen, char * result, ast_expression node){
     ast_expression expr;
     ast_expression_type operation;
 
-    expr = node->unary_op->expression;
+    expr = node->operands.unary_op.expression;
     operation = node->type;
 
     generate_expression(gen, "GF@tmp_op", expr);
@@ -283,175 +565,443 @@ void generate_unary(generator gen, char * result, ast_expression node){
     }
 }
 
-void generate_binary(generator gen, char * result, ast_expression node){
-    ast_expression left;
-    ast_expression right;
-    ast_expression_type operation;
-
-    left = node->binary_op->left;
-    right = node->binary_op->rigth;
-    operator = node->type;
+void generate_repetition(generator gen, char *result, char *left, char *right) {
+    char tmp[20];
     
+    string start_label_str = string_create(20);
+    string end_label_str = string_create(20);
+    
+    snprintf(tmp, 20, "%u", gen->counter++);
 
-    generate_expression(gen, "GF@tmp_l", left); //left expression
-    generate_expression(gen, "GF@tmp_r", right); //right expression
+    string_append_literal(start_label_str, "REPETITION_START_");
+    string_append_literal(start_label_str, tmp); 
+    
+    string_append_literal(end_label_str, "REPETITION_END_");
+    string_append_literal(end_label_str, tmp);
+    
+    char *label_start = start_label_str->data;
+    char *label_end = end_label_str->data;
 
-    switch (operation) { //switch of all operators
+    // Využití GF@tmp1 jako počítadla (POČET OPAKOVÁNÍ) a GF@tmp2 jako výsledného řetězce (VÝSLEDEK)
+    move_var(gen, "GF@tmp2", "string@");
+    move_var(gen, "GF@tmp1", right);
+
+    string_append_literal(gen->output, "\n# REPETITION LOOP START\n");
+        
+
+    // počet opakování <= 0
+    op_eq(gen, "GF@tmp_if", "GF@tmp1", "int@0");
+    add_jumpifeq(gen, label_end, "GF@tmp_if", "bool@true"); 
+    op_lt(gen, "GF@tmp_if", "GF@tmp1", "int@0");
+    add_jumpifeq(gen, label_end, "GF@tmp_if", "bool@true"); 
+
+    label(gen, label_start);
+
+    // VÝSLEDEK = VÝSLEDEK + ŘETĚZEC_K_OPAKOVÁNÍ
+    op_concat(gen, "GF@tmp2", "GF@tmp2", left);
+
+    // POČÍTADLO = POČÍTADLO - 1
+    move_var(gen, "GF@tmp3", "int@1");
+    op_sub(gen, "GF@tmp1", "GF@tmp1", "GF@tmp3");
+    
+    // Dokud POČÍTADLO > 0
+    op_gt(gen, "GF@tmp_op", "GF@tmp1", "int@0");
+    add_jumpifeq(gen, label_start, "GF@tmp_op", "bool@true");
+
+    label(gen, label_end);
+    string_append_literal(gen->output, "# REPETITION LOOP END\n");
+
+    move_var(gen, result, "GF@tmp2");
+
+    string_destroy(start_label_str);
+    string_destroy(end_label_str);
+}
+
+void generate_type_check(generator gen, char *symb1, char *symb2, char *error_label) {
+    
+    ifj_type(gen, "GF@tmp1", symb1);
+
+    ifj_type(gen, "GF@tmp2", symb2);
+
+    string_append_literal(gen->output, "\n# TYPE CHECK: If types of ");
+    string_append_literal(gen->output, symb1);
+    string_append_literal(gen->output, " and ");
+    string_append_literal(gen->output, symb2);
+    string_append_literal(gen->output, " are not equal, jump to error.\n");
+
+    add_jumpifneq(gen, error_label, "GF@tmp1", "GF@tmp2");
+    
+    string_append_literal(gen->output, "# TYPE CHECK: OK\n");
+}
+
+void generate_ifj_str(generator gen, char *result, ast_parameter param) {
+    char tmp[20];
+    snprintf(tmp, 20, "%u", gen->counter++);
+    string label_int = string_create(20);
+    string label_string = string_create(20);
+    string label_end = string_create(20);
+    
+    string_append_literal(label_int, "STR_INT_");
+    string_append_literal(label_int, tmp);
+    string_append_literal(label_string, "STR_FLOAT_");
+    string_append_literal(label_string, tmp);
+    string_append_literal(label_end, "STR_END_");
+    string_append_literal(label_end, tmp);
+    
+    move_var(gen, "GF@tmp1", ast_value_to_string(NULL, param));
+    ifj_type(gen, "GF@tmp_ifj", "GF@tmp1");
+    
+    string_append_literal(gen->output, "\n# STR: Runtime type check\n");
+
+    add_jumpifeq(gen, label_int->data, "GF@tmp_ifj", "string@int");
+    add_jumpifeq(gen, label_string->data, "GF@tmp_ifj", "string@float");
+
+    move_var(gen, result, "nil@nil");
+    jump(gen, label_end->data);
+
+    label(gen, label_int->data);
+    ifj_int2str(gen, result, "GF@tmp1"); 
+    jump(gen, label_end->data);
+
+    label(gen, label_string->data);
+    ifj_float2str(gen, result, "GF@tmp1");
+
+    label(gen, label_end->data);
+    string_append_literal(gen->output, "# STR: End type check\n\n");
+
+    string_destroy(label_int);
+    string_destroy(label_string);
+    string_destroy(label_end);
+}
+
+void generate_float_conversion(generator gen, char *var_name, char *type_name) {
+    char tmp[20];
+    snprintf(tmp, 20, "%u", gen->counter++);
+    string label_end = string_create(20);
+    string_append_literal(label_end, "SKIP_INT2FLOAT_");
+    string_append_literal(label_end, tmp);
+    
+    add_jumpifeq(gen, label_end->data, type_name, "string@float"); 
+
+    add_jumpifneq(gen, label_end->data, type_name, "string@int"); 
+    
+    string_append_literal(gen->output, "# INT TO FLOAT CONVERSION\n");
+
+    ifj_int2float(gen, "GF@tmp1", var_name); 
+    move_var(gen, var_name, "GF@tmp1");
+    string_append_literal(gen->output, "# CONVERSION END\n");
+
+    label(gen, label_end->data);
+
+    string_destroy(label_end);
+}
+
+void generate_add_conversion(generator gen, char *result, char *left, char *right) {
+    char tmp[20];
+    snprintf(tmp, 20, "%u", gen->counter++);
+    string skip_conversion_label = string_create(20);
+    string_append_literal(skip_conversion_label, "SKIP_CORECION_");
+    string_append_literal(skip_conversion_label, tmp);
+    
+    string skip_concat_label = string_create(20);
+    string_append_literal(skip_concat_label, "SKIP_CONCAT_");
+    string_append_literal(skip_concat_label, tmp);
+
+    string skip_end_label = string_create(20);
+    string_append_literal(skip_end_label, "SKIP_END_");
+    string_append_literal(skip_end_label, tmp);
+
+    string_append_literal(gen->output, "\n# START ADDITION/CONCAT CHECK\n");
+
+    ifj_type(gen, "GF@tmp_l", left);
+    ifj_type(gen, "GF@tmp_r", right);
+
+    op_eq(gen, "GF@tmp_ifj", "GF@tmp_l", "string@string"); 
+    add_jumpifneq(gen, skip_concat_label->data, "GF@tmp_ifj", "bool@true"); 
+    
+    op_eq(gen, "GF@tmp_ifj", "GF@tmp_r", "string@string"); 
+    add_jumpifneq(gen, skip_concat_label->data, "GF@tmp_ifj", "bool@true"); 
+
+    op_concat(gen, result, left, right); 
+    jump(gen, skip_end_label->data); 
+    
+    label(gen, skip_concat_label->data);
+
+    op_eq(gen, "GF@tmp_ifj", "GF@tmp_l", "string@float");
+    add_jumpifeq(gen, skip_conversion_label->data, "GF@tmp_ifj", "bool@true"); 
+
+    op_eq(gen, "GF@tmp_ifj", "GF@tmp_r", "string@float");
+    add_jumpifneq(gen, skip_conversion_label->data, "GF@tmp_ifj", "bool@false");
+
+    label(gen, skip_conversion_label->data);
+    generate_float_conversion(gen, left, "GF@tmp_l");
+    generate_float_conversion(gen, right, "GF@tmp_r");
+    
+    string_append_literal(gen->output, "# END ADDITION/CONCAT CHECK\n");
+    generate_type_check(gen, left, right, "ERR26");
+    op_add(gen, result, left, right);
+    label(gen, skip_end_label->data);
+
+    string_destroy(skip_conversion_label);
+    string_destroy(skip_concat_label); 
+    string_destroy(skip_end_label);
+}
+
+void generate_mul_conversion(generator gen, char *result, char *left, char *right) {
+    char tmp[20];
+        snprintf(tmp, 20, "%u", gen->counter++);
+        string skip_repetition_label = string_create(20);
+        string_append_literal(skip_repetition_label, "SKIP_REPETITION_");
+        string_append_literal(skip_repetition_label, tmp);
+
+        string skip_end_label = string_create(20);
+        string_append_literal(skip_end_label, "MUL_END_");
+        string_append_literal(skip_end_label, tmp);
+
+        string_append_literal(gen->output, "\n# START STRING REPETITION CHECK (STRING * INT)\n");
+
+        ifj_type(gen, "GF@tmp_l", left);
+        ifj_type(gen, "GF@tmp_r", right);
+
+        op_eq(gen, "GF@tmp_ifj", "GF@tmp_l", "string@string"); 
+        add_jumpifneq(gen, skip_repetition_label->data, "GF@tmp_ifj", "bool@true"); 
+        
+        generate_repetition(gen, result, left, right); 
+        jump(gen, skip_end_label->data); 
+        
+        label(gen, skip_repetition_label->data);
+        
+        string_append_literal(gen->output, "# END STRING REPETITION CHECK\n");
+        string_destroy(skip_repetition_label);
+
+        string skip_conversion_label_mul = string_create(20);
+        string_append_literal(skip_conversion_label_mul, "SKIP_COERCION_MUL_");
+        string_append_literal(skip_conversion_label_mul, tmp);
+        
+        string_append_literal(gen->output, "\n# START AUTO INT->FLOAT COERCION CHECK FOR MULTIPLICATION\n");
+
+        op_eq(gen, "GF@tmp_ifj", "GF@tmp_l", "string@float");
+        add_jumpifeq(gen, skip_conversion_label_mul->data, "GF@tmp_ifj", "bool@true"); 
+
+        op_eq(gen, "GF@tmp_ifj", "GF@tmp_r", "string@float");
+        add_jumpifneq(gen, skip_conversion_label_mul->data, "GF@tmp_ifj", "bool@false");
+
+        label(gen, skip_conversion_label_mul->data);
+        generate_float_conversion(gen, left, "GF@tmp_l");
+        generate_float_conversion(gen, right, "GF@tmp_r");
+        
+        string_append_literal(gen->output, "# END AUTO INT->FLOAT COERCION\n");
+        
+        generate_type_check(gen, left, right, "ERR26");
+        op_mul(gen, result, left, right);
+        label(gen, skip_end_label->data);
+        
+        string_destroy(skip_conversion_label_mul);
+        string_destroy(skip_end_label);
+}
+
+void generate_binary(generator gen, char * result, ast_expression node){
+    ast_expression left = node->operands.binary_op.left;
+    ast_expression right = node->operands.binary_op.right;
+    ast_expression_type operation = node->type;
+    
+    char *left_temp = generate_temp_var(gen);
+    char *right_temp = generate_temp_var(gen);
+    char *value;
+
+    define_variable(gen, left_temp);
+    define_variable(gen, right_temp);
+
+    generate_expression(gen, left_temp, left);
+    if(operation != AST_IS)
+        generate_expression(gen, right_temp, right);
+    
+    if (operation != AST_IS && operation != AST_ADD && operation != AST_MUL) {
+        char tmp[20];
+        snprintf(tmp, 20, "%u", gen->counter++);
+        string skip_conversion_label = string_create(20);
+        string_append_literal(skip_conversion_label, "SKIP_COERCION_");
+        string_append_literal(skip_conversion_label, tmp);
+        
+        string_append_literal(gen->output, "\n# START AUTO INT->FLOAT COERCION CHECK FOR BINARY OP\n");
+
+        ifj_type(gen, "GF@tmp_l", left_temp);
+        ifj_type(gen, "GF@tmp_r", right_temp);
+
+        op_eq(gen, "GF@tmp_ifj", "GF@tmp_l", "string@float");
+        add_jumpifeq(gen, skip_conversion_label->data, "GF@tmp_ifj", "bool@true"); 
+
+        op_eq(gen, "GF@tmp_ifj", "GF@tmp_r", "string@float");
+        add_jumpifneq(gen, skip_conversion_label->data, "GF@tmp_ifj", "bool@false");
+
+        label(gen, skip_conversion_label->data);
+        generate_float_conversion(gen, left_temp, "GF@tmp_l");
+        generate_float_conversion(gen, right_temp, "GF@tmp_r");
+        
+        string_append_literal(gen->output, "# END AUTO INT->FLOAT COERCION\n");
+        string_destroy(skip_conversion_label);
+        generate_type_check(gen, left_temp, right_temp, "ERR26");
+    }
+
+    switch (operation) {
         case AST_ADD:
-            op_add(gen, result, left->expression->value->value->data, right->expression->value->value->data);
+            generate_add_conversion(gen, result, left_temp, right_temp);
             break;
         case AST_SUB:
-            op_sub(gen, result, left->expression->value->value->data, right->expression->value->value->data);
+            op_sub(gen, result, left_temp, right_temp);
             break;
         case AST_MUL:
-            op_mul(gen, result, left->expression->value->value->data, right->expression->value->value->data);
+            generate_mul_conversion(gen, result, left_temp, right_temp);
             break;
-        case AST_DIV:
-            op_div(gen, result, left->expression->value->value->data, right->expression->value->value->data);
+        case AST_DIV: 
+            op_div(gen, result, left_temp, right_temp);
             break;
         case AST_LT:
-            op_lt(gen, result, left->expression->value->value->data, right->expression->value->value->data);
+            op_lt(gen, result, left_temp, right_temp);
             break;
         case AST_GT:
-            op_gt(gen, result, left->expression->value->value->data, right->expression->value->value->data);
+            op_gt(gen, result, left_temp, right_temp);
             break;
-        case AST_EQ:
-            op_eq(gen, result, left->expression->value->value->data, right->expression->value->value->data);
+        case AST_EQUALS:
+            op_eq(gen, result, left_temp, right_temp);
             break;
         case AST_AND:
-            op_and(gen, result, left->expression->value->value->data, right->expression->value->value->data);
+            op_and(gen, result, left_temp, right_temp);
             break;
         case AST_OR:
-            op_or(gen, result, left->expression->value->value->data, right->expression->value->value->data);
+            op_or(gen, result, left_temp, right_temp);
             break;
         case AST_LE:
-            op_lt(gen, "GF@tmp1", left->expression->value->value->data, right->expression->value->value->data);
-            op_eq(gen, "GF@tmp2", left->expression->value->value->data, right->expression->value->value->data);
-            op_lt(gen, result, "GF@tmp1", "GF@tmp2");
+            op_lt(gen, "GF@tmp1", left_temp, right_temp);
+            op_eq(gen, "GF@tmp2", left_temp, right_temp);
+            op_or(gen, result, "GF@tmp1", "GF@tmp2");
             break;
         case AST_GE:
-            op_gt(gen, "GF@tmp1", left->expression->value->value->data, right->expression->value->value->data);
-            op_eq(gen, "GF@tmp2", left->expression->value->value->data, right->expression->value->value->data);
-            op_lt(gen, result, "GF@tmp1", "GF@tmp2");
+            op_gt(gen, "GF@tmp1", left_temp, right_temp);
+            op_eq(gen, "GF@tmp2", left_temp, right_temp);
+            op_or(gen, result, "GF@tmp1", "GF@tmp2");
             break;
-        case AST_CONCAT:
-            op_concat(gen, result, left->expression->value->value->data, right->expression->value->value->data);
-            break;
+        //case AST_REPETITION:
+            //generate_repetition(gen, result, left_temp, right_temp);
+            //break;
+        case AST_IS:
+            ifj_type(gen, left_temp, ast_value_to_string(left, NULL));
+            if (strcmp(right->operands.identifier.value, "Num") == 0)
+                value = "string@int";
+            else if (strcmp(right->operands.identifier.value, "String") == 0)
+                value = "string@string";
+            else if (strcmp(right->operands.identifier.value, "Null") == 0)
+                value = "string@nil";
+            op_eq(gen, result, left_temp, value);
         default:
             break;
     }
+
+    free(left_temp);
+    free(right_temp);
 }
 
 void generate_expression(generator gen, char * result, ast_expression node){
-
-    switch(get_op_arity(node->type)){
-        case ARITY_UNARY:
-            generate_unary(gen, result, node); //only one variable
-            break;
-        case ARITY_BINARY:
-            generate_binary(gen, result, node); //two variables
-            break;
-        default:
-            break;
+    
+    if (node->type == AST_VALUE) {
+        char *value = ast_value_to_string(node, NULL);
+        move_var(gen, result, value);
+    }
+    else if (node->type == AST_IDENTIFIER){
+        char *value = ast_value_to_string(node, NULL);
+        move_var(gen, result, value); //move LF@var value
+    }
+    else if (node->type == AST_IFJ_FUNCTION_EXPR)
+        generate_ifjfunction(gen, node->operands.ifj_function->name, node->operands.ifj_function->parameters, result);
+    else if (node->type == AST_FUNCTION_CALL) {
+        generate_function_call(gen, NULL, node);
+        move_var(gen, result, "GF@fn_ret");
+    }
+    else {
+        switch(get_op_arity(node->type)){
+                case ARITY_UNARY:
+                    generate_unary(gen, result, node); //only one variable
+                    break;
+                case ARITY_BINARY:
+                    generate_binary(gen, result, node); //two variables
+                    break;
+                default:
+                    break;
+        }
     }
 }
 
-void generate_ifjfunction(generator gen, ast_node node, char* output){ 
-    // TODO: rewrite, ifj function is part of function call
-    switch(node->ifjFunction->type){
-        case IFJ_FUNCTION_CHR:
-            IFJ_int2char(gen, output, node->ifjFunction->param1->value->data);
-            break;
-        case IFJ_FUNCTION_CONCAT:
-            op_concat(gen, output, node->ifjFunction->param1->value->data, node->ifjFunction->param2->value->data);
-            break;
-        case IFJ_FUNCTION_F2I:
-            IFJ_float2int(gen, output->, node->ifjFunction->param1->value->data);
-            break;
-        case IFJ_FUNCTION_I2F:
-            IFJ_int2float(gen, output->value->data, node->ifjFunction->param1->value->data);
-            break;
-        case IFJ_FUNCTION_LENGTH:
-            ifj_strlen(gen, output->value->data, node->ifjFunction->param1->value->data);
-            break;
-        case IFJ_FUNCTION_ORD:
-            ifj_getchar(gen, "GF@tmp_ifj", node->ifjFunction->param1->value->data, node->ifjFunction->param2->value->data);
-            IFJ_stri2int(gen, output->value->data, "GF@tmp_ifj");
-            break;
-        case IFJ_FUNCTION_READF64:
-            ifj_read(gen, output->value->data, "float");
-            break;
-        case IFJ_FUNCTION_READI32:
-            ifj_read(gen, output->value->data, "int");
-            break;
-        case IFJ_FUNCTION_READSTR:
-            ifj_read(gen, output->value->data, "string");
-            break;
-        case IFJ_FUNCTION_STRCMP:
-            break;
-        case IFJ_FUNCTION_STRING:
-            move_var(gen, output->value->data, node->ifjFunction->param1->value->data);
-            break;
-        case IFJ_FUNCTION_SUBSTRING:
-            break;
-        case IFJ_FUNCTION_WRITE:
-            ifj_write(gen, node->ifjFunction->param1->value->data);
-            break;
+void generate_ifjfunction(generator gen, char* name, ast_parameter params, char* output){ 
+    if(strcmp(name, "str") == 0)
+        generate_ifj_str(gen, output, params);
+    else if(strcmp(name, "chr") == 0)
+        ifj_int2char(gen, output, ast_value_to_string(NULL, params));
+    else if(strcmp(name, "floor") == 0)
+        ifj_float2int(gen, output, ast_value_to_string(NULL, params));
+    else if(strcmp(name, "length") == 0)
+        ifj_strlen(gen, output, ast_value_to_string(NULL, params));
+    else if(strcmp(name, "ord") == 0){
+        ifj_getchar(gen, output, ast_value_to_string(NULL, params), ast_value_to_string(NULL, params->next));
+    }
+    else if(strcmp(name, "read_num") == 0)
+        ifj_read(gen, output, "float");
+    else if(strcmp(name, "read_str") == 0)
+        ifj_read(gen, output, "string");
+    else if(strcmp(name, "strcmp") == 0)
+        op_eq(gen, output, ast_value_to_string(NULL, params), ast_value_to_string(NULL, params->next));
+    //else if(strcmp(name, "substring"))
+    else if(strcmp(name, "write") == 0)
+        ifj_write(gen, ast_value_to_string(NULL, params));
+    else {
+        string_append_literal(gen->output, "#IFJ FUN: ");
+        string_append_literal(gen->output, name);
+        string_append_literal(gen->output, " not implemented\n");
     }
 }
 
-void generate_function_call(generator gen, asst_node node){
-    // TODO: create parsing and checking for ifj functions
-    // TODO: push in reverse order
-    ast_function_call fun = node->function_call;
-    ast_parameter param = fun->parameters;
-    while(param != null){
-        push(gen, param->name);
+void generate_function_call(generator gen, ast_node node, ast_expression expr_node){
+    stack stack;
+    stack_init(&stack);
+    ast_parameter param;
+    char *name;
+    if (node) {
+        param = node->data.function_call->parameters;
+        name = node->data.function_call->name;
+    } else {
+        param = expr_node->operands.function_call->parameters;
+        name = expr_node->operands.function_call->name;
+    }
+    while(param != NULL){
+        stack_push(&stack, ast_value_to_string(NULL, param));
         param = param->next;
     }
-    locToLable(fun->name);
-    fn_call(gen, fun->name); //call function
+    char *param_name;
+    while(!stack_is_empty(&stack)){ //reverse push
+        param_name = stack_pop(&stack);
+        push(gen, param_name);
+    }
+    fn_call(gen, name); //call function*/
+
+    stack_free(&stack);
 }
 
 void generate_function_return(generator gen, ast_node node){
-    if(node->return_expr->identity) //string or number value
-        move_var(gen, "GF@fn_ret", node->return_expr->identity->value);
-    else if (node->return_expr->identifier)
-        move_var(gen, "GF@fn_ret", node->return_expr->identifier->value);
-    else
-        generate_expression(gen, "GF@fn_ret", node->functionReturn->expression);
+    if(node->data.return_expr.output)
+        generate_expression(gen, "GF@fn_ret", node->data.return_expr.output);
     popframe(gen);
     return_code(gen);
 }
 
 void generate_assignment(generator gen, ast_node node){
-    string name = string_create(10);
-    string_append_literal(name, node->assignment->name);
-    string value = string_create(10);
-    if(node->assignment->expression != NULL){
-        if(node->assignment->value->identitfier){ //not expression
-            if(node->assignment->expression->expression->type != AST_NIL){
-                string_append_literal(value, node->assignment->value->identifier);
-            }
-            else{
-                string_append_literal(value, "nil@nil");
-            }
-            move_var(gen, name->data, value->data); //move LF@var value
-        }
-        else if(node->assignment->value->identity){
-            move_var(gen, node->assignment->value->identity->string_value, value->data);
-        }
-        else{ //expression
-            generate_expression(gen, name->data, node->assignment->value); //expression
-        }
-    }   
-    string_destroy(name);
-    string_destroy(value);
+    if(node->data.assignment.value != NULL){
+        ast_expression expr = node->data.assignment.value;
+        generate_expression(gen, node->data.assignment.name, expr); //expression
+    }
 }
 
 void generate_declaration(generator gen, ast_node node){
-    define_variable(gen, node->declaration->name);
-    //generate_assignment(gen, node->declaration->assignment); //when implemented
+    define_variable(gen, node->data.declaration.name);
+    //generate_assignment(gen, node->data.declaration.assignment); //when implemented
 }
 
 void generate_if_statement(generator gen, ast_node node){
@@ -459,13 +1009,12 @@ void generate_if_statement(generator gen, ast_node node){
     string end_label = string_create(20);
     string else_lable = string_create(20);
     ast_block body;
-    ast_node body_node
 
     string_append_literal(end_label, "conditionEnd");
     snprintf(tmp, 20, "%u", gen->counter++);
     string_append_literal(end_label, tmp); //create one of label for end of if
 
-    if(node->condition->else_branch == NULL) //no else
+    if(node->data.condition.else_branch == NULL) //no else
         string_append_literal(else_lable, end_label->data);
     else{
         string_clear(else_lable);
@@ -476,30 +1025,22 @@ void generate_if_statement(generator gen, ast_node node){
     
     //create condition
     string_append_literal(gen->output, "\n# IF CONDITION\n");
-    generate_expression(gen, "GF@tmp_if", node->condition->condition); //creates the condition
+    generate_expression(gen, "GF@tmp_if", node->data.condition.condition); //creates the condition
     add_jumpifeq(gen, else_lable->data, "GF@tmp_if", "bool@false");
     string_append_literal(gen->output, "# IF CONDITION END\n\n");
 
     
-    if(node->condition->if_branch != NULL){
+    if(node->data.condition.if_branch != NULL){
         string_append_literal(gen->output, "# IF BRANCH\n");
-        body = node->condition->if_branch;
-        body_node = body->first;
-        while(body_node != NULL){
-            generate_node(body_node, gen);
-            body_node = body_node->next;
-        }
+        body = node->data.condition.if_branch;
+        generate_block(gen, body);
         jump(gen, end_label->data);
     }
-    if(node->condition->else_branch != NULL){ //else exists
+    if(node->data.condition.else_branch != NULL){ //else exists
         label(gen, else_lable->data);
         string_append_literal(gen->output, "\n# ELSE BRANCH\n");
-        body = node->condition->else_branch;
-        body_node = body->first;
-        while(body_node != NULL){
-            generate_node(body_node, gen);
-            body_node = body_line->next;
-        }
+        body = node->data.condition.else_branch;
+        generate_block(gen, body);
     }
 
     label(gen, end_label->data);
@@ -513,7 +1054,6 @@ void generate_while(generator gen, ast_node node){
     string while_start = string_create(20);
     string while_end = string_create(20);
     ast_block body;
-    ast_node body_node;
 
     string_append_literal(while_start, "whileStart");
     string_append_literal(while_end, "whileEnd");
@@ -524,23 +1064,19 @@ void generate_while(generator gen, ast_node node){
     
     string_append_literal(gen->output, "\n# WHILE LOOP START\n");
     
-    generate_expression(gen, "GF@tmp_while", node->while_loop->condition); //creates the condition
+    generate_expression(gen, "GF@tmp_while", node->data.while_loop.condition); //creates the condition
     add_jumpifeq(gen, while_end->data, "GF@tmp_while", "bool@false");
 
     string_append_literal(gen->output, "\n");
     label(gen, while_start->data); //start lable
 
 
-    body = node->while_loop->body;
-    body_node = body->first;
-    while(body_node != NULL){ //generate inner code
-        generate_node(body_node, gen);
-        body_node = body_node->next;
-    }
+    body = node->data.while_loop.body;
+    generate_block(gen, body);
 
 
     string_append_literal(gen->output, "\n");
-    generate_expression(gen, "GF@tmp_while", node->while_loop->condition); //creates the condition
+    generate_expression(gen, "GF@tmp_while", node->data.while_loop.condition); //creates the condition
     add_jumpifneq(gen, while_start->data, "GF@tmp_while", "bool@false");
 
     label(gen, while_end->data); //end lable
@@ -565,7 +1101,7 @@ void generate_node(ast_node node, generator gen){
             break;
 
         case AST_IFJ_FUNCTION: //read / write
-            generate_ifjfunction(gen, node, NULL);
+            generate_ifjfunction(gen, node->data.ifj_function->name, node->data.ifj_function->parameters, NULL);
             break;
 
         case AST_WHILE_LOOP:
@@ -573,15 +1109,34 @@ void generate_node(ast_node node, generator gen){
             break;
 
         case AST_CALL_FUNCTION:
-            generate_function_call(gen, node);
+            generate_function_call(gen, node, NULL);
             break;
 
         case AST_RETURN:
             generate_function_return(gen, node);
             break;
-
+        case AST_BLOCK:
+            generate_block(gen, node->data.block);
+            break;
+        case AST_FUNCTION:
+            generate_function(gen, node);
+            break;
+        case AST_GETTER:
+            generate_function(gen, node);
+            break;
+        case AST_SETTER:
+            generate_function(gen, node);
+            break;
         default:
             break;
+    }
+}
+
+void generate_block(generator gen, ast_block block){
+    ast_node node = block->first;
+    while (node) {
+        generate_node(node, gen);
+        node = node->next;
     }
 }
 
@@ -598,6 +1153,7 @@ void init_code(generator gen, ast ast){ //.IFJcode25 on the first line and initi
         define_variable(gen, "GF@tmp_ifj");
         define_variable(gen, "GF@tmp1");
         define_variable(gen, "GF@tmp2");
+        define_variable(gen, "GF@tmp3");
         define_variable(gen, "GF@fn_ret");
     }
 }
@@ -606,40 +1162,60 @@ void generate_code(generator gen, ast ast){ //go threw all nodes in AST
     if(ast != NULL && ast->class_list != NULL){
         ast_class program = ast->class_list; //opens 'program' class   
         ast_block program_body = program->current; // class block
-        ast_node fun = program_body->first; // function node
-        while(fun != NULL){
-            generate_function(gen, fun->function);
-            fun = fun->next; // next node, must be function or null
-        }
+
+        generate_block(gen, program_body);
+
+        label(gen, "ERR26");
+        string_append_literal(gen->output, "# ERROR: Incompatible types for binary operation.\n");
+        exit_code(gen, "int@26");
+
         string_append_literal(gen->output, "\n#END OF FILE\n");
     }
 }
 
-void generate_function(generator gen, ast_function fun){
-    ast_block fun_body = fun->code;
-    locToLable(fun->name);
+void generate_function(generator gen, ast_node node){
+    char *name;
+    ast_block fun_body;
+    ast_parameter param = NULL;
+    if(node->type == AST_FUNCTION) {
+        name = node->data.function->name;
+        param = node->data.function->parameters;
+        fun_body = node->data.function->code;
+    }
+    else if(node->type == AST_GETTER) {
+        name = node->data.getter.name;
+        fun_body = node->data.getter.body;
+    }
+    else if(node->type == AST_SETTER) {
+        name = node->data.setter.name;
+        fun_body = node->data.setter.body;
+    }
+    else
+        return;
     string_append_literal(gen->output, "\n# START OF FUNCTION ---");
-    string_append_literal(gen->output, fun->name);
-    string_append_literal(gen->output, "\n");
-    label(gen, fun->name);
+    string_append_literal(gen->output, name);
+    string_append_literal(gen->output, "---\n");
+    label(gen, name);
     createframe(gen); //create function frame
     pushframe(gen); //use new frame
-    ast_parameter param = fun->parameters;
-    while(param != null){
-        define_variable(gen, param->name);
-        pop(gen, param->name);
+    while(param != NULL){
+        define_variable(gen, ast_value_to_string(NULL, param));
+        pop(gen, ast_value_to_string(NULL, param));
         param = param->next;
     }
-    
-    ast_node fun_node = fun_body->first;
-    while(fun_node){ //generate all inside code
-        generate_node(fun_node, gen);
-        fun_node = fun_node->next;
+    if(node->type == AST_SETTER) {
+        define_variable(gen, node->data.setter.param);
+        pop(gen, node->data.setter.param);
     }
+
+    generate_block(gen, fun_body); //generate body
+
     popframe(gen); //pop frame from stack and use previous
     string_append_literal(gen->output, "# END OF FUNCTION ---");
-    string_append_literal(gen->output, fun->name);
-    string_append_literal(gen->output, "\n");
-    if(strcmp(fun->name, "main") == 0)
-        exit_code(gen, "int@0");
+    string_append_literal(gen->output, name);
+    string_append_literal(gen->output, "---\n");
+    if(strcmp(name, "main") == 0)
+        exit_code(gen, "int@0\n");
+    move_var(gen, "GF@fn_ret", "nil@nil");
+    return_code(gen);
 }

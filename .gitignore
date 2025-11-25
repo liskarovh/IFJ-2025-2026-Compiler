@@ -56,4 +56,11 @@ dkms.conf
 
 # build
 build/
-.vscode/settings.json
+projekt/run_stx_tests.sh
+tests/
+ifjMoreTests/
+projekt/run_cc_tests.sh
+projekt/ic25int-linux-x86_64
+projekt/test_out.txt
+projekt/out.txt
+test/python/__pycache__

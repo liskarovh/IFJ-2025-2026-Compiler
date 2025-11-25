@@ -47,6 +47,7 @@ typedef struct {
     const char        *qname;
     unsigned           arity;
     builtin_param_kind param_kinds[3];
+    data_type          return_type;
     bool               needs_boolthen; /**< Register only if cfg.ext_boolthen. */
     bool               needs_statican; /**< Register only if cfg.ext_statican. */
 } builtin_row;
@@ -56,55 +57,69 @@ static const builtin_row g_rows[] = {
     /* I/O */
     { "Ifj.read_str",  0,
       { BUILTIN_PARAM_ANY,     BUILTIN_PARAM_ANY,     BUILTIN_PARAM_ANY },
+      ST_STRING,   // návratový typ – String nebo Null, staticky bereme String
       false, false },
 
     { "Ifj.read_num",  0,
       { BUILTIN_PARAM_ANY,     BUILTIN_PARAM_ANY,     BUILTIN_PARAM_ANY },
+      ST_DOUBLE,   // Num
       false, false },
 
     { "Ifj.write",     1,
       { BUILTIN_PARAM_ANY,     BUILTIN_PARAM_ANY,     BUILTIN_PARAM_ANY },
+      ST_NULL,     // "print" – vrací null
       false, false },
 
     /* Conversions / numeric helpers */
     { "Ifj.floor",     1,
       { BUILTIN_PARAM_NUMBER,  BUILTIN_PARAM_ANY,     BUILTIN_PARAM_ANY },
+      ST_DOUBLE,   // bereme jako "Num" – číselný typ
       false, false },
 
     { "Ifj.str",       1,
       { BUILTIN_PARAM_ANY,     BUILTIN_PARAM_ANY,     BUILTIN_PARAM_ANY },
+      ST_STRING,
       false, false },
 
     /* Strings */
     { "Ifj.length",    1,
       { BUILTIN_PARAM_STRING,  BUILTIN_PARAM_ANY,     BUILTIN_PARAM_ANY },
+      ST_DOUBLE,   // délka = číslo
       false, false },
 
     { "Ifj.substring", 3,
       { BUILTIN_PARAM_STRING,  BUILTIN_PARAM_NUMBER,  BUILTIN_PARAM_NUMBER },
+      ST_STRING,
       false, false },
 
     { "Ifj.strcmp",    2,
       { BUILTIN_PARAM_STRING,  BUILTIN_PARAM_STRING,  BUILTIN_PARAM_ANY },
+      ST_DOUBLE,   // porovnání – obvykle číslo (<0,0,>0)
       false, false },
 
     { "Ifj.ord",       2,
       { BUILTIN_PARAM_STRING,  BUILTIN_PARAM_NUMBER,  BUILTIN_PARAM_ANY },
+      ST_DOUBLE,   // kód znaku – číslo
       false, false },
 
     { "Ifj.chr",       1,
       { BUILTIN_PARAM_NUMBER,  BUILTIN_PARAM_ANY,     BUILTIN_PARAM_ANY },
+      ST_STRING,
       false, false },
 
     /* Extensions */
+
     { "Ifj.read_bool", 0,
       { BUILTIN_PARAM_ANY,     BUILTIN_PARAM_ANY,     BUILTIN_PARAM_ANY },
+      ST_BOOL,     // Bool nebo Null, staticky bereme Bool
       true,  false },  /* BOOLTHEN */
 
     { "Ifj.is_int",    1,
       { BUILTIN_PARAM_ANY,     BUILTIN_PARAM_ANY,     BUILTIN_PARAM_ANY },
+      ST_BOOL,
       false, true  }   /* STATICAN (optional helper) */
 };
+
 
 bool builtins_install(symtable *gtab, builtins_config cfg) {
     if (!gtab) {
@@ -138,7 +153,7 @@ bool builtins_install(symtable *gtab, builtins_config cfg) {
 
         d->symbol_type = ST_FUN;
         d->param_count = (int)r->arity;
-        /* Keep other st_data fields as defaults for Pass 1. */
+        d->data_type   = r->return_type;
     }
 
     return true;

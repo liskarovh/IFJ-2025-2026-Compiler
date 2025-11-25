@@ -352,7 +352,7 @@ int parse_expr(DLListTokens *tokenlist, ast_expression *out_ast){
                     } else if (tokenlist->active->token->type == T_KW_NULL)
                         new_param->value_type = AST_VALUE_NULL;
                     else {
-                        if (tokenlist->active->token->type == T_IDENT)
+                        if (tokenlist->active->token->type == T_IDENT || tokenlist->active->token->type == T_GLOB_IDENT)
                             new_param->value_type = AST_VALUE_IDENTIFIER;
                         else new_param->value_type = AST_VALUE_STRING;
                         new_param->value.string_value = tokenlist->active->token->value->data;
@@ -430,7 +430,7 @@ int parse_expr(DLListTokens *tokenlist, ast_expression *out_ast){
                     } else if (tokenlist->active->token->type == T_KW_NULL)
                         new_param->value_type = AST_VALUE_NULL;
                     else {
-                        if (tokenlist->active->token->type == T_IDENT)
+                        if (tokenlist->active->token->type == T_IDENT || tokenlist->active->token->type == T_GLOB_IDENT)
                             new_param->value_type = AST_VALUE_IDENTIFIER;
                         else new_param->value_type = AST_VALUE_STRING;
                         new_param->value.string_value = tokenlist->active->token->value->data;

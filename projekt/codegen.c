@@ -14,6 +14,7 @@
 #include "error.h"
 #include "string.h"
 #include "stack.h"
+#include "semantic.h"
 
 
 void generate_unary(generator gen, char * result, ast_expression node);
@@ -99,6 +100,27 @@ char* var_frame_parse(char *var) {
     strcat(varout, var);
     
     return varout;
+}
+
+static void sem_def_globals(generator gen) {
+    char **globals = NULL;
+    size_t count   = 0;
+
+    int rc = semantic_get_magic_globals(&globals, &count);
+    if (rc != SUCCESS) {
+        return;
+    }
+    string_append_literal(gen->output, "\n# GLOABLS DECLARATION\n");
+    for (size_t i = 0; i < count; ++i) {
+        string_append_literal(gen->output, "DEFVAR GF@");
+        string_append_literal(gen->output, globals[i]);
+        string_append_literal(gen->output, "\nMOVE GF@");
+        string_append_literal(gen->output, globals[i]);
+        string_append_literal(gen->output, " nil@nil\n");
+        free(globals[i]);
+    }
+    string_append_literal(gen->output, "\n");
+    free(globals);
 }
 
 char* escape_string_literal(const char* original_str) {
@@ -1155,6 +1177,8 @@ void init_code(generator gen, ast ast){ //.IFJcode25 on the first line and initi
         define_variable(gen, "GF@tmp2");
         define_variable(gen, "GF@tmp3");
         define_variable(gen, "GF@fn_ret");
+
+        sem_def_globals(gen);
     }
 }
 

@@ -2546,10 +2546,10 @@ int semantic_pass1(ast syntax_tree) {
 
     // Final symbol table dump after Pass-1
     sem_pretty_print_symbol_table(&semantic_table);
-    sem_debug_print_magic_globals();
 
     // Run Pass-2 (identifier + call resolution) with the same semantic_table.
     int pass2_result = semantic_pass2(&semantic_table, syntax_tree);
+    sem_debug_print_magic_globals();
 
     st_free(semantic_table.funcs);
     st_free(semantic_table.symtab);
@@ -2604,6 +2604,11 @@ static int sem2_resolve_identifier(semantic *cxt, const char *name)
 
     /* Magic globals */
     if (is_magic_global_identifier(name)) {
+        int rc = sem_magic_globals_add(name);
+        if (rc != SUCCESS) {
+            return rc;    // ERR_INTERNAL, když se nepovede realloc/malloc
+        }
+
         printf("[sem2][ID] → magic global OK\n");
         return SUCCESS;
     }

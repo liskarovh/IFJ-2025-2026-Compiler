@@ -26,7 +26,7 @@
  *
  * Error codes (error.h):
  *  - ERR_DEF     (3)  : main() arity must be 0; use-before-declare of a local / unknown LHS / undefined ident / call
- *  - ERR_REDEF   (4)  : duplicate (name,arity); duplicate getter/setter; local redeclare
+ *  - ERR_REDEF   (4)  : duplicate (name,arity) in one class; duplicate getter/setter in one class; local redeclare
  *  - ERR_ARGNUM  (5)  : wrong number or literal types of arguments in function/builtin call
  *  - ERR_EXPR    (6)  : literal-only type error in an expression
  *  - ERR_SEM     (10) : break/continue outside of loop
@@ -46,6 +46,121 @@
 
 /* Forward declaration: implemented at the end of this file. */
 int semantic_pass2(semantic *table, ast syntax_tree);
+
+/* =========================================================================
+ *          Global magic-identifier registry for code generator
+ * ========================================================================= */
+/**
+ * @brief Debug: vytiskne aktuální seznam magických globálních proměnných.
+ *
+ * Volá semantic_get_magic_globals(), vypíše je na stdout a zase je uvolní.
+ * g_magic_globals uvnitř semantic.c zůstává nedotčený.
+ */
+static void sem_debug_print_magic_globals(void)
+{
+    char **globals = NULL;
+    size_t count   = 0;
+
+    int rc = semantic_get_magic_globals(&globals, &count);
+    if (rc != SUCCESS) {
+        fprintf(stdout,
+                "[sem] magic globals: semantic_get_magic_globals failed (rc=%d)\n",
+                rc);
+        return;
+    }
+
+    fprintf(stdout, "[sem] magic globals (%zu):\n", count);
+    for (size_t i = 0; i < count; ++i) {
+        fprintf(stdout, "  - %s\n",
+                globals[i] ? globals[i] : "(null)");
+        free(globals[i]);
+    }
+    free(globals);
+}
+
+/**
+ * We collect names of all magic globals ("__name") that appear as LHS
+ * of assignments during semantic analysis. This registry is process-global,
+ * because our semantic_pass1() currently owns the whole semantic_ctx
+ * internally and frees it before returning to main.
+ *
+ * For the purposes of this project, one global registry is enough.
+ */
+
+typedef struct {
+    char  **items;
+    size_t count;
+    size_t capacity;
+} sem_magic_globals;
+
+static sem_magic_globals g_magic_globals = { NULL, 0, 0 };
+
+/**
+ * @brief Reset the registry (called before starting semantic_pass1()).
+ */
+static void sem_magic_globals_reset(void)
+{
+    if (g_magic_globals.items) {
+        for (size_t i = 0; i < g_magic_globals.count; ++i) {
+            free(g_magic_globals.items[i]);
+        }
+        free(g_magic_globals.items);
+    }
+    g_magic_globals.items    = NULL;
+    g_magic_globals.count    = 0;
+    g_magic_globals.capacity = 0;
+}
+
+/**
+ * @brief Add a magic-global name into the registry (if not already present).
+ *
+ * Stores a heap-allocated copy of the name.
+ */
+static int sem_magic_globals_add(const char *name)
+{
+    if (!name) {
+        return SUCCESS;
+    }
+
+    /* ensure it's really magic "__something" (defensive) */
+    if (name[0] != '_' || name[1] != '_') {
+        return SUCCESS;
+    }
+
+    /* deduplicate: linear search is fine for small counts */
+    for (size_t i = 0; i < g_magic_globals.count; ++i) {
+        if (strcmp(g_magic_globals.items[i], name) == 0) {
+            return SUCCESS;
+        }
+    }
+
+    /* grow capacity if needed */
+    if (g_magic_globals.count == g_magic_globals.capacity) {
+        size_t new_cap = (g_magic_globals.capacity == 0)
+                         ? 8
+                         : g_magic_globals.capacity * 2;
+        char **new_items = realloc(g_magic_globals.items,
+                                   new_cap * sizeof(char *));
+        if (!new_items) {
+            return error(ERR_INTERNAL,
+                         "semantic: failed to grow magic globals array");
+        }
+        g_magic_globals.items    = new_items;
+        g_magic_globals.capacity = new_cap;
+    }
+
+    /* copy name */
+    size_t len = strlen(name);
+    char *copy = malloc(len + 1);
+    if (!copy) {
+        return error(ERR_INTERNAL,
+                     "semantic: failed to allocate magic global name");
+    }
+    memcpy(copy, name, len + 1);
+
+    g_magic_globals.items[g_magic_globals.count++] = copy;
+    return SUCCESS;
+}
 
 /* =========================================================================
  *                  Small numeric helper (no snprintf)
@@ -554,7 +669,7 @@ static bool sem_has_accessor(semantic *semantic_table,
 /**
  * @brief Check LHS of assignment: locals, magic globals and setters are allowed.
  *
- *  - "__foo" is always OK (global variable semantics).
+ *  - "__foo" is always OK (global variable semantics) and recorded for codegen.
  *  - existing local (var/param) → OK.
  *  - existing setter for given base name → OK.
  *  - otherwise → ERR_DEF (3).
@@ -565,8 +680,12 @@ static int sem_check_assignment_lhs(semantic *semantic_table,
         return SUCCESS;
     }
 
-    // magic globals are always allowed
+    // magic globals are always allowed – and we record them for codegen
     if (is_magic_global_identifier(name)) {
+        int rc = sem_magic_globals_add(name);
+        if (rc != SUCCESS) {
+            return rc;
+        }
         return SUCCESS;
     }
 
@@ -595,10 +714,13 @@ static int collect_headers_from_block(semantic *semantic_table,
 
 /**
  * @brief Insert a user function signature (name, arity) into the global table.
- *        Raises ERR_REDEF (4) on duplicate (name,arity).
- *        Stores scope_name and ID into st_data.
- *        In Pass-1 this does NOT insert the function into semantic_table->symtab
- *        – that is done in the bodies walk (AST_FUNCTION).
+ *
+ *        - Duplicity se hlídá v rámci jedné třídy:
+ *          * stejný (name, arity) + stejná class_scope_name → ERR_REDEF (4)
+ *          * stejný (name, arity) v jiné třídě → povoleno (sdílí se záznam)
+ *
+ *        - Stores scope_name and ID into st_data.
+ *        - V Pass-1 to NEvkládá funkci do semantic_table->symtab – to dělá bodies walk (AST_FUNCTION).
  */
 static int function_table_insert_signature(semantic *semantic_table,
                                            const char *function_name,
@@ -607,8 +729,35 @@ static int function_table_insert_signature(semantic *semantic_table,
     char function_key[256];
     make_function_key(function_key, sizeof function_key, function_name, arity);
 
-    if (st_find(semantic_table->funcs, (char *)function_key)) {
-        return error(ERR_REDEF, "duplicate function signature: %s", function_key);
+    /* Už existuje nějaká funkce se stejným jménem a aritou? */
+    st_data *existing = st_get(semantic_table->funcs, (char *)function_key);
+    if (existing) {
+        const char *existing_scope = NULL;
+        if (existing->scope_name &&
+            existing->scope_name->data &&
+            existing->scope_name->length > 0) {
+            existing_scope = existing->scope_name->data;
+        }
+
+        const char *new_scope = class_scope_name;
+
+        /* Stejné (name, arity) ve stejné třídě → chyba 4 */
+        if (existing_scope && new_scope &&
+            strcmp(existing_scope, new_scope) == 0) {
+            return error(ERR_REDEF,
+                         "duplicate function signature %s in class '%s'",
+                         function_key,
+                         existing_scope);
+        }
+
+        /* Stejné (name, arity) v jiné třídě → povoleno, jen logneme. */
+        fprintf(stdout,
+                "[sem] function signature %s already exists in class '%s', "
+                "new class '%s' allowed (per-class overloading).\n",
+                function_key,
+                existing_scope ? existing_scope : "(none)",
+                new_scope ? new_scope : "(none)");
+        return SUCCESS;
     }
 
     fprintf(stdout,
@@ -681,9 +830,14 @@ static int function_table_insert_signature(semantic *semantic_table,
 }
 
 /**
- * @brief Insert getter/setter signature (enforce at most one getter and one setter per base).
- *        Stores scope_name and ID (for getter/setter ID == base).
- *        Does NOT insert into semantic_table->symtab (only into funcs).
+ * @brief Insert getter/setter signature.
+ *
+ *        - V rámci jedné třídy smí být max. jeden getter a jeden setter pro dané base jméno:
+ *          * druhý getter/setter ve stejné třídě → ERR_REDEF (4)
+ *          * getter/setter se stejným base v jiné třídě → povoleno (sdílí záznam)
+ *
+ *        - Ukládá scope_name a ID (ID == base).
+ *        - NEvkládá do semantic_table->symtab (jen do funcs).
  */
 static int function_table_insert_accessor(semantic *semantic_table,
                                           const char *base_name,
@@ -695,11 +849,38 @@ static int function_table_insert_accessor(semantic *semantic_table,
     char accessor_key[256];
     make_accessor_key(accessor_key, sizeof accessor_key, base_name, is_setter);
 
-    if (st_find(semantic_table->funcs, (char *)accessor_key)) {
-        return error(ERR_REDEF,
-                     is_setter ? "duplicate setter for '%s'"
-                               : "duplicate getter for '%s'",
-                     base_name ? base_name : "(null)");
+    /* Zkusit najít existující accessor se stejným base jménem. */
+    st_data *existing = st_get(semantic_table->funcs, (char *)accessor_key);
+    if (existing) {
+        const char *existing_scope = NULL;
+        if (existing->scope_name &&
+            existing->scope_name->data &&
+            existing->scope_name->length > 0) {
+            existing_scope = existing->scope_name->data;
+        }
+
+        const char *new_scope = class_scope_name;
+
+        /* Stejný getter/setter ve stejné třídě → chyba 4. */
+        if (existing_scope && new_scope &&
+            strcmp(existing_scope, new_scope) == 0) {
+            return error(ERR_REDEF,
+                         is_setter
+                             ? "duplicate setter for '%s' in class '%s'"
+                             : "duplicate getter for '%s' in class '%s'",
+                         base_name ? base_name : "(null)",
+                         existing_scope);
+        }
+
+        /* Jiná třída → povoleno, jen logneme. */
+        fprintf(stdout,
+                "[sem] accessor %s for base '%s' already exists in class '%s', "
+                "new class '%s' allowed.\n",
+                is_setter ? "setter" : "getter",
+                base_name ? base_name : "(null)",
+                existing_scope ? existing_scope : "(none)",
+                new_scope ? new_scope : "(none)");
+        return SUCCESS;
     }
 
     fprintf(stdout,
@@ -872,6 +1053,130 @@ static literal_kind get_literal_kind_of_value_expression(ast_expression expressi
     }
 }
 
+/**
+ * @brief Recursively compute literal-kind for whole expression subtree.
+ *
+ *  - LITERAL_NUMERIC ... expression composed only of numeric literals and
+ *                        numeric-only operators (+,-,*,/,..., no identifiers)
+ *  - LITERAL_STRING  ... expression composed only of string literals and
+ *                        string-safe operators (string+string, string*int literal, concat)
+ *  - LITERAL_UNKNOWN ... anything involving identifiers, calls, or mixed/unsupported types
+ */
+static literal_kind get_expression_literal_kind(ast_expression expression_node) {
+    if (!expression_node) {
+        return LITERAL_UNKNOWN;
+    }
+
+    switch (expression_node->type) {
+        case AST_VALUE:
+            return get_literal_kind_of_value_expression(expression_node);
+
+        case AST_ADD: {
+            literal_kind left_kind =
+                get_expression_literal_kind(
+                    expression_node->operands.binary_op.left);
+            literal_kind right_kind =
+                get_expression_literal_kind(
+                    expression_node->operands.binary_op.right);
+
+            if (!left_kind || !right_kind) {
+                return LITERAL_UNKNOWN;
+            }
+
+            /* Numeric addition → numeric */
+            if (left_kind == LITERAL_NUMERIC &&
+                right_kind == LITERAL_NUMERIC) {
+                return LITERAL_NUMERIC;
+            }
+
+            /* String concatenation using '+' → string */
+            if (left_kind == LITERAL_STRING &&
+                right_kind == LITERAL_STRING) {
+                return LITERAL_STRING;
+            }
+
+            return LITERAL_UNKNOWN;
+        }
+
+        case AST_SUB:
+        case AST_DIV: {
+            literal_kind left_kind =
+                get_expression_literal_kind(
+                    expression_node->operands.binary_op.left);
+            literal_kind right_kind =
+                get_expression_literal_kind(
+                    expression_node->operands.binary_op.right);
+
+            if (left_kind == LITERAL_NUMERIC &&
+                right_kind == LITERAL_NUMERIC) {
+                return LITERAL_NUMERIC;
+            }
+            return LITERAL_UNKNOWN;
+        }
+
+        case AST_MUL: {
+            literal_kind left_kind =
+                get_expression_literal_kind(
+                    expression_node->operands.binary_op.left);
+            literal_kind right_kind =
+                get_expression_literal_kind(
+                    expression_node->operands.binary_op.right);
+
+            /* Numeric multiply → numeric */
+            if (left_kind == LITERAL_NUMERIC &&
+                right_kind == LITERAL_NUMERIC) {
+                return LITERAL_NUMERIC;
+            }
+
+            /* String * integer literal → string (repetition) */
+            if (left_kind == LITERAL_STRING &&
+                expression_is_integer_literal(
+                    expression_node->operands.binary_op.right)) {
+                return LITERAL_STRING;
+            }
+
+            return LITERAL_UNKNOWN;
+        }
+
+        case AST_CONCAT: {
+            literal_kind left_kind =
+                get_expression_literal_kind(
+                    expression_node->operands.binary_op.left);
+            literal_kind right_kind =
+                get_expression_literal_kind(
+                    expression_node->operands.binary_op.right);
+
+            if (left_kind == LITERAL_STRING &&
+                right_kind == LITERAL_STRING) {
+                return LITERAL_STRING;
+            }
+            return LITERAL_UNKNOWN;
+        }
+
+        /* Relational / logical / ternary / IS – result is bool,
+         * we do not propagate a numeric/string literal-kind here.
+         * Type collisions across these are still checked in sem_check_literal_binary().
+         */
+        case AST_EQUALS:
+        case AST_NOT_EQUAL:
+        case AST_LT:
+        case AST_LE:
+        case AST_GT:
+        case AST_GE:
+        case AST_AND:
+        case AST_OR:
+        case AST_TERNARY:
+        case AST_IS:
+            return LITERAL_UNKNOWN;
+
+        default:
+            /* IDENTIFIER, FUNCTION_CALL, and anything else that isn't
+             * pure literal-only arithmetic/concat.
+             */
+            return LITERAL_UNKNOWN;
+    }
+}
+
 static int visit_expression_node(semantic *semantic_table,
                                  ast_expression expression_node);
 
@@ -956,7 +1261,7 @@ static param_kind sem_get_param_literal_kind(ast_parameter param) {
         param->value.string_value[0] == '_' &&
         param->value.string_value[1] == '_') {
         return PARAM_KIND_UNKNOWN;
-        }
+    }
 
     switch (param->value_type) {
         case AST_VALUE_STRING:
@@ -1164,11 +1469,11 @@ static int sem_visit_binary_expr(semantic *semantic_table,
         return result_code;
     }
 
-    // literal-only checks
+    // literal-only checks – rekurzivně přes celý podvýraz
     literal_kind left_kind =
-        get_literal_kind_of_value_expression(left_expression);
+        get_expression_literal_kind(left_expression);
     literal_kind right_kind =
-        get_literal_kind_of_value_expression(right_expression);
+        get_expression_literal_kind(right_expression);
 
     return sem_check_literal_binary((int)expression_node->type,
                                     left_kind,
@@ -2141,6 +2446,9 @@ int semantic_pass1(ast syntax_tree) {
     semantic semantic_table;
     memset(&semantic_table, 0, sizeof semantic_table);
 
+    /* reset registry of magic globals for this compilation */
+    sem_magic_globals_reset();
+
     semantic_table.funcs = st_init();
     if (!semantic_table.funcs) {
         return error(ERR_INTERNAL,
@@ -2217,6 +2525,7 @@ int semantic_pass1(ast syntax_tree) {
 
     // Final symbol table dump after Pass-1
     sem_pretty_print_symbol_table(&semantic_table);
+    sem_debug_print_magic_globals();
 
     // Run Pass-2 (identifier + call resolution) with the same semantic_table.
     int pass2_result = semantic_pass2(&semantic_table, syntax_tree);
@@ -2308,7 +2617,7 @@ static int sem2_check_function_call(semantic *cxt,
 
         printf("[sem2][CALL] → builtin, key='%s'\n", key);
 
-        if (!st_find(cxt->funcs, key)) {
+        if (!st_find(cxt->funcs, (char *)key)) {
             printf("[sem2][CALL] → ERROR builtin wrong arity\n");
             return error(ERR_ARGNUM,
                          "wrong number of arguments for builtin %s(%d)",
@@ -2678,5 +2987,51 @@ int semantic_pass2(semantic *table, ast syntax_tree)
     }
 
     printf("[sem2] Pass 2 completed successfully.\n");
+    return SUCCESS;
+}
+
+/* =========================================================================
+ *      Public API: export list of magic globals ("__name") for codegen
+ * ========================================================================= */
+
+int semantic_get_magic_globals(char ***out_globals, size_t *out_count)
+{
+    if (!out_globals || !out_count) {
+        return error(ERR_INTERNAL,
+                     "semantic_get_magic_globals: NULL output pointer");
+    }
+
+    /* allocate a deep copy of the array of char*;
+     * caller will own both the array and the strings.
+     */
+    if (g_magic_globals.count == 0) {
+        *out_globals = NULL;
+        *out_count   = 0;
+        return SUCCESS;
+    }
+
+    char **copy = malloc(g_magic_globals.count * sizeof(char *));
+    if (!copy) {
+        return error(ERR_INTERNAL,
+                     "semantic_get_magic_globals: allocation failed");
+    }
+
+    for (size_t i = 0; i < g_magic_globals.count; ++i) {
+        size_t len = strlen(g_magic_globals.items[i]);
+        copy[i] = malloc(len + 1);
+        if (!copy[i]) {
+            /* clean up already allocated strings */
+            for (size_t j = 0; j < i; ++j) {
+                free(copy[j]);
+            }
+            free(copy);
+            return error(ERR_INTERNAL,
+                         "semantic_get_magic_globals: allocation failed (string)");
+        }
+        memcpy(copy[i], g_magic_globals.items[i], len + 1);
+    }
+
+    *out_globals = copy;
+    *out_count   = g_magic_globals.count;
     return SUCCESS;
 }

@@ -97,4 +97,17 @@ int semantic_pass1(ast tree);
 
 int semantic_pass2(semantic *table, ast tree);
 
+
+/**
+ * @brief Collect names of all used globals ("__name") during semantic analysis.
+ *
+ * @param out_globals  Output pointer to dynamically allocated array of char*.
+ * @param out_count    Output pointer to number of elements in the array.
+ *
+ * On error (allocation failure), returns ERR_INTERNAL (99) and leaves
+ * *out_globals and *out_count unspecified.
+ */
+int semantic_get_magic_globals(char ***out_globals, size_t *out_count);
+
+
 #endif /* SEMANTIC_H */

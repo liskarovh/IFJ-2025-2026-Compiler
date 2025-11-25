@@ -240,7 +240,6 @@ enum arity get_op_arity(ast_expression_type type){
         case AST_OR:
         case AST_IS:
         case AST_CONCAT:
-        case AST_REPETITION:
             return ARITY_BINARY;
         case AST_NOT:
             return ARITY_UNARY;
@@ -817,7 +816,7 @@ void generate_binary(generator gen, char * result, ast_expression node){
     if(operation != AST_IS)
         generate_expression(gen, right_temp, right);
     
-    if (operation != AST_REPETITION && operation != AST_IS && operation != AST_ADD && operation != AST_MUL) {
+    if (operation != AST_IS && operation != AST_ADD && operation != AST_MUL) {
         char tmp[20];
         snprintf(tmp, 20, "%u", gen->counter++);
         string skip_conversion_label = string_create(20);
@@ -1217,4 +1216,6 @@ void generate_function(generator gen, ast_node node){
     string_append_literal(gen->output, "---\n");
     if(strcmp(name, "main") == 0)
         exit_code(gen, "int@0\n");
+    move_var(gen, "GF@fn_ret", "nil@nil");
+    return_code(gen);
 }

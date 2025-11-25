@@ -2562,6 +2562,35 @@ int semantic_pass1(ast syntax_tree) {
  * ========================================================================= */
 
 static int sem2_visit_block(semantic *table, ast_block blk);
+__attribute__((unused))
+static void sem2_debug_print_scope_locals(semantic *cxt, const char *msg)
+{ 
+    const char *scope = sem_scope_ids_current(&cxt->ids);
+
+    printf("\n====== %s (scope=%s) ======\n", msg, scope);
+
+    char prefix[64];
+    snprintf(prefix, sizeof(prefix), "%s::", scope);
+
+    for (int i = 0; i < SYMTABLE_SIZE; i++) {
+        st_symbol *s = &cxt->symtab->table[i];
+        if (!s->occupied || !s->data) continue;
+
+        if (strncmp(s->key, prefix, strlen(prefix)) != 0)
+            continue;
+
+        st_data *d = s->data;
+
+        if (d->symbol_type == ST_VAR && !d->global) {
+            printf("LOCAL %-12s  cg_name = %-12s\n",
+                   s->key,
+                   d->cg_name ? d->cg_name : "(none)");
+        }
+    }
+
+    printf("========================================\n\n");
+}
+
 
 /* -------------------------------------------------------------------------
  *  Identifier resolver (with rich debug)
@@ -2856,19 +2885,45 @@ static int sem2_visit_statement_node(semantic *table, ast_node node)
             return sem2_visit_expr(table, node->data.expression);
 
         case AST_VAR_DECLARATION: {
-            const char *name = node->data.declaration.name;
-            printf("[sem2] DECLARE var '%s' (scope=%s)\n",
-                   name,
-                   sem_scope_ids_current(&table->ids));
+    const char *name = node->data.declaration.name;
 
-            // Insert variable into the current scope, same as Pass 1
-            if (!scopes_declare_local(&table->scopes, name, true)) {
-                return error(ERR_REDEF,
-                             "variable '%s' already declared in this scope",
-                             name);
-            }
-            return SUCCESS;
+    // 1. Declare variable in local scope
+    if (!scopes_declare_local(&table->scopes, name, true)) {
+        return error(ERR_REDEF,
+                     "variable '%s' already declared in this scope", name);
+    }
+
+    // 2. Lookup the symbol normally (Pass1 inserted it already)
+    st_data *sym = scopes_lookup(&table->scopes, name);
+    if (!sym) {
+        return error(ERR_INTERNAL,
+                     "scope lookup failed for '%s'", name);
+    }
+
+    // 3. Build scope-clean version (remove dots)
+    char scope_raw[64];
+    snprintf(scope_raw, sizeof scope_raw,
+             "%s", sem_scope_ids_current(&table->ids));
+
+    char scope_clean[64];
+    int j = 0;
+    for (int i = 0; scope_raw[i] != '\0'; i++) {
+        if (scope_raw[i] != '.') {
+            scope_clean[j++] = scope_raw[i];
         }
+    }
+    scope_clean[j] = '\0';
+
+    // 4. Create final cg name: "name_scopeID"
+    char final[128];
+    snprintf(final, sizeof final, "%s_%s", name, scope_clean);
+
+    sym->cg_name = my_strdup(final);
+
+    //printf("[sem2] cg_name for '%s' => '%s'\n",name,sym->cg_name ? sym->cg_name : "(none)");
+
+    return SUCCESS;
+}
 
         case AST_ASSIGNMENT: {
             const char *lhs = node->data.assignment.name;
@@ -3065,6 +3120,7 @@ static int sem2_visit_block(semantic *table, ast_block blk)
 
     printf("[sem2][BLK] NEW scope=%s\n",
            sem_scope_ids_current(&table->ids));
+        //sem2_debug_print_scope_locals(table, "ENTER BLOCK");
 
     for (ast_node n = blk->first; n; n = n->next) {
         printf("[sem2][BLK] Visiting node...\n");

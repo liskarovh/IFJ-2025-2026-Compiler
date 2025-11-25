@@ -84,17 +84,16 @@ void st_insert(symtable *table,char *key, symbol_type type, bool defined){
 
     place->occupied = true;
     place->deleted = false;
-
     place->data->symbol_type = type;
-    place->data->defined     = defined;
-    place->data->param_count = 0;
-    place->data->data_type   = ST_NULL;
-    place->data->global      = false;
-    place->data->ID          = NULL;
-    place->data->params      = NULL;
-    place->data->scope_name  = NULL;
-
+    place->data->defined = defined;
     table->size++;
+    place->data->param_count = 0;
+    place->data->data_type = ST_NULL;
+    place->data->global = false;
+    place->data->ID = NULL;
+    place->data->params = NULL;
+    place->data->scope_name = NULL;
+    place->data->cg_name = NULL;
 }
 
 st_data *st_get(symtable *table, char *key){

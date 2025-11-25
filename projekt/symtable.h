@@ -41,6 +41,7 @@ typedef struct st_data{
     //functions
     int param_count;
     string *params;
+    char *cg_name;
     
     // main, block etc.
     string scope_name;
@@ -121,6 +122,6 @@ typedef void (*st_iter_cb)(const char *key, st_data *data, void *user_data);
  *        For each (key, data) calls cb(key, data, user_data).
  */
 void st_foreach(symtable *t, st_iter_cb cb, void *user_data);
-
+char *my_strdup(const char *s);
 
 #endif // SYMTABLE_H

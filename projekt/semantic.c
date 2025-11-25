@@ -2257,6 +2257,7 @@ typedef struct {
     const char *name;    // identifier without "<scope>::" prefix
     symbol_type kind;    // ST_FUN / ST_VAR / ST_PAR / ...
     int arity;           // for functions/accessors; otherwise 0
+    data_type   data_type;  // ST_INT / ST_DOUBLE / ST_STRING / ...
 } sem_row;
 
 typedef struct {
@@ -2313,6 +2314,7 @@ static void sem_collect_rows_cb(const char *key,
     row->name  = name_string;
     row->kind  = data ? data->symbol_type : ST_VAR;
     row->arity = data ? data->param_count : 0;
+    row->data_type = data ? data->data_type : ST_NULL;
 }
 
 // ordering: by scope, then name, then kind+arity
@@ -2334,6 +2336,19 @@ static int sem_row_compare(const void *a, const void *b) {
         return (int)row_a->kind - (int)row_b->kind;
     }
     return row_a->arity - row_b->arity;
+}
+
+static const char *sem_data_type_to_str(data_type t) {
+    switch (t) {
+        case ST_NULL:   return "Null";
+        case ST_INT:    return "Int";
+        case ST_DOUBLE: return "Double";
+        case ST_STRING: return "String";
+        case ST_BOOL:   return "Bool";
+        case ST_VOID:   return "Void";
+        case ST_U8:     return "U8";
+        default:        return "?";
+    }
 }
 
 static const char *sem_kind_to_str(symbol_type symbol_kind) {
@@ -2413,20 +2428,26 @@ static void sem_pretty_print_symbol_table(semantic *semantic_table) {
             fprintf(stdout,
                     "-----------------------------------------------------------\n");
             fprintf(stdout,
-                    "%-20s %-12s %-5s\n",
-                    "Name", "Kind", "Arity");
+                "%-20s %-12s %-5s %-8s\n",
+                "Name", "Kind", "Arity", "Type");
             fprintf(stdout,
-                    "%-20s %-12s %-5s\n",
+                    "%-20s %-12s %-5s %-8s\n",
                     "--------------------",
                     "------------",
-                    "-----");
+                    "-----",
+                    "--------");
+
         }
 
         const char *kind_string = sem_kind_to_str(row->kind);
-        fprintf(stdout, "%-20s %-12s %-5d\n",
+        const char *type_string = sem_data_type_to_str(row->data_type);
+
+        fprintf(stdout, "%-20s %-12s %-5d %-8s\n",
                 row->name,
                 kind_string,
-                row->arity);
+                row->arity,
+                type_string);
+
     }
 
     fprintf(stdout,

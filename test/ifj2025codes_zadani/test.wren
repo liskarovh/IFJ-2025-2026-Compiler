@@ -18,7 +18,7 @@ class Program {
             }
         }
     }
-    
+
     static funkce(a, b) {
         if(a == 5) {
             a = 6
@@ -42,23 +42,22 @@ class Program {
 
         return a
     }
-    
+
     static value {
         return __val
     }
-    
+
     static value=(v) {
         __val = v
     }
-    
+
     static f(a, b) {
         var a
         a = 5
         if(a == "a") {
 
         } else {
-            Ifj.write("It woooooooorks")
-            //a = Ifj.read() + b
+            a = Ifj.read() + b
         }
     }
 }

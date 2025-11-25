@@ -134,16 +134,25 @@ bool reduce_rule(stack *stack) {
         stack_push_value(stack, &item, sizeof(item));
         return true;
     }
-    else if(top.symbol == ID) {
+    else if (top.symbol == ID) {
         expr_item item = *(expr_item *)stack_pop(stack);
-        item.expr = malloc(sizeof(struct ast_expression));
-        item.expr->type = AST_ID;
-        item.expr->operands.identifier.value = item.token->value->data;
+
+        if (item.expr == NULL) {
+            // === PŘESNĚ TO CO TAM BYLO DOTEĎ ===
+            item.expr = malloc(sizeof(struct ast_expression));
+            if (!item.expr) {
+                return ERR_INTERNAL;
+            }
+            item.expr->type = AST_ID;
+            item.expr->operands.identifier.value = item.token->value->data;
+        }
+        // else: item.expr už existuje
+
         item.symbol = EXPR;
 
         top = *(expr_item *)stack->top->data;
         if(top.symbol == SHIFT_MARK) {
-            expr_item *p = (expr_item *)stack_pop(stack); 
+            expr_item *p = (expr_item *)stack_pop(stack);
             if(p) free(p);
         }
 
@@ -340,8 +349,12 @@ int parse_expr(DLListTokens *tokenlist, ast_expression *out_ast){
                     } else if (tokenlist->active->token->type == T_INT) {
                         new_param->value_type = AST_VALUE_INT;
                         new_param->value.int_value = tokenlist->active->token->value_int;
-                    } else {
-                        new_param->value_type = AST_VALUE_STRING;
+                    } else if (tokenlist->active->token->type == T_KW_NULL)
+                        new_param->value_type = AST_VALUE_NULL;
+                    else {
+                        if (tokenlist->active->token->type == T_IDENT)
+                            new_param->value_type = AST_VALUE_IDENTIFIER;
+                        else new_param->value_type = AST_VALUE_STRING;
                         new_param->value.string_value = tokenlist->active->token->value->data;
                     }
 
@@ -400,7 +413,7 @@ int parse_expr(DLListTokens *tokenlist, ast_expression *out_ast){
                     if(type != T_IDENT && type != T_STRING && type != T_ML_STRING && 
                         type != T_FLOAT && type != T_INT && 
                         type != T_BOOL_FALSE && type != T_BOOL_TRUE &&
-                        type != T_GLOB_IDENT) {
+                        type != T_GLOB_IDENT && type != T_KW_NULL) {
                         return ERR_SYN;
                     }
 
@@ -414,8 +427,12 @@ int parse_expr(DLListTokens *tokenlist, ast_expression *out_ast){
                     } else if (tokenlist->active->token->type == T_INT) {
                         new_param->value_type = AST_VALUE_INT;
                         new_param->value.int_value = tokenlist->active->token->value_int;
-                    } else {
-                        new_param->value_type = AST_VALUE_STRING;
+                    } else if (tokenlist->active->token->type == T_KW_NULL)
+                        new_param->value_type = AST_VALUE_NULL;
+                    else {
+                        if (tokenlist->active->token->type == T_IDENT)
+                            new_param->value_type = AST_VALUE_IDENTIFIER;
+                        else new_param->value_type = AST_VALUE_STRING;
                         new_param->value.string_value = tokenlist->active->token->value->data;
                     }
                     new_param->next = NULL;

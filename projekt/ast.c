@@ -435,6 +435,8 @@ void ast_print_node(ast_node node, char *offset) {
                     printf("%d", parameter->value.int_value);
                 else if (parameter->value_type == AST_VALUE_FLOAT)
                     printf("%f", parameter->value.double_value);
+                else if (parameter->value_type == AST_VALUE_NULL)
+                    printf("Null value");
                 else
                     printf("%s", parameter->value.string_value);
                 parameter = parameter->next;
@@ -460,6 +462,8 @@ void ast_print_node(ast_node node, char *offset) {
                     printf("%d", parameter->value.int_value);
                 else if (parameter->value_type == AST_VALUE_FLOAT)
                     printf("%f", parameter->value.double_value);
+                else if (parameter->value_type == AST_VALUE_NULL)
+                    printf("Null value");
                 else
                     printf("%s", parameter->value.string_value);
                 parameter = parameter->next;
@@ -519,6 +523,8 @@ void ast_print_node(ast_node node, char *offset) {
                     printf("%d", parameter->value.int_value);
                 else if (parameter->value_type == AST_VALUE_FLOAT)
                     printf("%f", parameter->value.double_value);
+                else if (parameter->value_type == AST_VALUE_NULL)
+                    printf("Null value");
                 else
                     printf("%s", parameter->value.string_value);
                 parameter = parameter->next;
@@ -620,6 +626,8 @@ void ast_print_expression(ast_expression expr, char *offset) {
                         printf("%d", parameter->value.int_value);
                     else if (parameter->value_type == AST_VALUE_FLOAT)
                         printf("%f", parameter->value.double_value);
+                    else if (parameter->value_type == AST_VALUE_NULL)
+                        printf("Null value");
                     else
                         printf("%s", parameter->value.string_value);
                     parameter = parameter->next;
@@ -640,6 +648,8 @@ void ast_print_expression(ast_expression expr, char *offset) {
                         printf("%d", parameter->value.int_value);
                     else if (parameter->value_type == AST_VALUE_FLOAT)
                         printf("%f", parameter->value.double_value);
+                    else if (parameter->value_type == AST_VALUE_NULL)
+                        printf("Null value");
                     else
                         printf("%s", parameter->value.string_value);
                     parameter = parameter->next;

@@ -19,6 +19,7 @@
 
 
 int main() {
+
     DLListTokens token_list;
     DLLTokens_Init(&token_list);
 
@@ -31,7 +32,6 @@ int main() {
 
     if (result != SUCCESS) {
         DLLTokens_Dispose(&token_list);
-        
         return result;
     }
     DLLTokens_First(&token_list);
@@ -40,16 +40,22 @@ int main() {
     ast_init(&ast_tree);
 
     result = parser(&token_list, ast_tree, GRAMMAR_PROGRAM);
-    if (result != SUCCESS) return result;
+    if (result != SUCCESS) {
+        DLLTokens_Dispose(&token_list);
+        return result;
+    }
 
-    ast_print(ast_tree);
-    
-    //init_code(gen, ast_tree);
-    //generate_code(gen, ast_tree);
-    //fputs(gen->output->data, stdout);
-    
 
+    //ast_print(ast_tree);
+
+    init_code(gen, ast_tree);
+    generate_code(gen, ast_tree);
+    fputs(gen->output->data, stdout);
+    
+    result = 0;
     free(gen);
     //ast_dispose(ast_tree);
     DLLTokens_Dispose(&token_list);
+
+    return result;
 }

@@ -60,7 +60,8 @@ typedef enum {
     AST_VALUE_INT,
     AST_VALUE_FLOAT,
     AST_VALUE_STRING,
-    AST_VALUE_NULL
+    AST_VALUE_NULL,
+    AST_VALUE_IDENTIFIER
 } ast_value_type;
 
 typedef struct ast_parameter {

@@ -24,11 +24,6 @@ bool has_own_block = false;
 /// @param expected_rule The grammar rule to apply
 /// @return SUCCESS on success, or an error code on failure
 int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule) {
-    while(tokenList->active->token->type == T_EOL) {
-        DLLTokens_Next(tokenList);
-    }
-    // token_format_string(tokenList->active->token);
-
     switch (expected_rule)
     {
     case GRAMMAR_PROGRAM: {
@@ -63,7 +58,7 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
         break;
     }
     case GRAMMAR_IMPORT_IFJ25: {
-        if(strcmp(tokenList->active->token->value->data, "ifj25") != 0) {
+        if(tokenList->active->token->type != T_STRING || strcmp(tokenList->active->token->value->data, "ifj25") != 0) {
             return ERR_SYN;
         }
 
@@ -78,7 +73,7 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
         break;
     }
     case GRAMMAR_IMPORT_FOR: {
-        if(strcmp(tokenList->active->token->value->data, "for") != 0) {
+        if(tokenList->active->token->type != T_IDENT || strcmp(tokenList->active->token->value->data, "for") != 0) {
             return ERR_SYN;
         }
         DLLTokens_Next(tokenList);
@@ -90,9 +85,7 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
         break;
     }
     case GRAMMAR_IMPORT_IFJ: {
-        if (tokenList->active->token->type == T_EOL)
-            DLLTokens_Next(tokenList);
-        if(strcmp(tokenList->active->token->value->data, "Ifj") != 0) {
+        if(tokenList->active->token->type != T_IDENT || strcmp(tokenList->active->token->value->data, "Ifj") != 0) {
             return ERR_SYN;
         }
 

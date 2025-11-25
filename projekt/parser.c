@@ -24,6 +24,10 @@ bool has_own_block = false;
 /// @param expected_rule The grammar rule to apply
 /// @return SUCCESS on success, or an error code on failure
 int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule) {
+    while(tokenList->active->token->type == T_EOL) {
+        DLLTokens_Next(tokenList);
+    }
+    
     switch (expected_rule)
     {
     case GRAMMAR_PROGRAM: {
@@ -73,7 +77,7 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
         break;
     }
     case GRAMMAR_IMPORT_FOR: {
-        if(tokenList->active->token->type != T_IDENT || strcmp(tokenList->active->token->value->data, "for") != 0) {
+        if(tokenList->active->token->type != T_KW_FOR || strcmp(tokenList->active->token->value->data, "for") != 0) {
             return ERR_SYN;
         }
         DLLTokens_Next(tokenList);
@@ -82,6 +86,7 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
         if (err != SUCCESS) {
             return err;
         }
+        
         break;
     }
     case GRAMMAR_IMPORT_IFJ: {
@@ -92,6 +97,10 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
         out_ast->import->alias = tokenList->active->token->value->data;
 
         DLLTokens_Next(tokenList);
+
+        if(tokenList->active->token->type == T_EOF) {
+            return ERR_SYN;
+        }
         break;
     }
     case GRAMMAR_CLASS_LIST: {

@@ -2745,11 +2745,42 @@ static int sem2_visit_expr(semantic *cxt, ast_expression e)
         case AST_EQUALS: case AST_NOT_EQUAL:
         case AST_LT: case AST_LE: case AST_GT: case AST_GE:
         case AST_AND: case AST_OR:
-        case AST_TERNARY: case AST_IS: case AST_CONCAT: {
+        case AST_TERNARY: case AST_CONCAT: {
             printf("[sem2][EXPR] → binary\n");
             int rc = sem2_visit_expr(cxt, e->operands.binary_op.left);
             if (rc != SUCCESS) return rc;
             return sem2_visit_expr(cxt, e->operands.binary_op.right);
+        }
+        case AST_IS: {
+            printf("[sem2][EXPR] → IS\n");
+
+
+            int rc = sem2_visit_expr(cxt, e->operands.binary_op.left);
+            if (rc != SUCCESS) return rc;
+
+            ast_expression rhs = e->operands.binary_op.right;
+            const char *type_name = NULL;
+
+            if (rhs && rhs->type == AST_IDENTIFIER && rhs->operands.identifier.value) {
+                type_name = rhs->operands.identifier.value;
+            }
+
+            if (!type_name) {
+                return error(ERR_EXPR,
+                             "invalid right-hand side of 'is' operator");
+            }
+
+            if (strcmp(type_name, "Num") != 0 &&
+                strcmp(type_name, "String") != 0 &&
+                strcmp(type_name, "Null") != 0) {
+                return error(ERR_EXPR,
+                             "invalid type '%s' on right-hand side of 'is' "
+                             "(expected Num, String or Null)",
+                             type_name);
+                }
+
+            printf("[sem2][EXPR] → IS '%s' OK\n", type_name);
+            return SUCCESS;
         }
 
         case AST_NONE:
@@ -2834,28 +2865,103 @@ static int sem2_visit_statement_node(semantic *table, ast_node node)
         case AST_FUNCTION: {
             printf("[sem2][STMT] → FUNCTION\n");
 
-            // enter function scope
+            ast_function fn = node->data.function;
+
+            // enter function scope (params + top-level body sdílí jeden rámec)
             sem_scope_enter_block(table);
             printf("[sem2][FUNC] scope=%s\n",
                    sem_scope_ids_current(&table->ids));
 
             // declare parameters "arg", "val", etc.
-            declare_parameter_list_in_current_scope(table, node->data.function->parameters);
+            int rc = declare_parameter_list_in_current_scope(table, fn->parameters);
+            if (rc != SUCCESS) {
+                sem_scope_leave_block(table, "function params");
+                return rc;
+            }
 
-            // now visit statements of the function body
-            int rc = sem2_visit_block(table, node->data.function->code);
+            // projít tělo funkce BEZ dalšího block-scopu (jako v Pass-1)
+            if (fn->code) {
+                for (ast_node stmt = fn->code->first; stmt; stmt = stmt->next) {
+                    rc = sem2_visit_statement_node(table, stmt);
+                    if (rc != SUCCESS) {
+                        sem_scope_leave_block(table, "function body");
+                        return rc;
+                    }
+                }
+            }
 
             sem_scope_leave_block(table, "function body");
-            return rc;
+            return SUCCESS;
         }
 
-        case AST_GETTER:
+        case AST_GETTER: {
             printf("[sem2][STMT] → GETTER\n");
-            return sem2_visit_block(table, node->data.getter.body);
 
-        case AST_SETTER:
+            ast_block body = node->data.getter.body;
+
+            // jeden scope pro celý getter (jako v Pass-1)
+            sem_scope_enter_block(table);
+            printf("[sem2][GETTER] scope=%s\n",
+                   sem_scope_ids_current(&table->ids));
+
+            int rc = SUCCESS;
+            if (body) {
+                for (ast_node stmt = body->first; stmt; stmt = stmt->next) {
+                    rc = sem2_visit_statement_node(table, stmt);
+                    if (rc != SUCCESS) {
+                        sem_scope_leave_block(table, "getter body");
+                        return rc;
+                    }
+                }
+            }
+
+            sem_scope_leave_block(table, "getter body");
+            return SUCCESS;
+        }
+
+        case AST_SETTER: {
             printf("[sem2][STMT] → SETTER\n");
-            return sem2_visit_block(table, node->data.setter.body);
+
+            const char *param_name = node->data.setter.param;
+            ast_block body        = node->data.setter.body;
+
+            // jeden scope pro setter (parametr + tělo, jako v Pass-1)
+            sem_scope_enter_block(table);
+            printf("[sem2][SETTER] scope=%s\n",
+                   sem_scope_ids_current(&table->ids));
+
+            // deklarace parametru setteru v tomto scope
+            if (param_name) {
+                printf("[sem2][SETTER] declare param '%s'\n", param_name);
+
+                if (!scopes_declare_local(&table->scopes, param_name, true)) {
+                    sem_scope_leave_block(table, "setter header");
+                    return error(ERR_REDEF,
+                                 "setter parameter redeclared: %s",
+                                 param_name);
+                }
+
+                st_data *param_data =
+                    scopes_lookup_in_current(&table->scopes, param_name);
+                if (param_data) {
+                    param_data->symbol_type = ST_PAR;
+                }
+            }
+
+            int rc = SUCCESS;
+            if (body) {
+                for (ast_node stmt = body->first; stmt; stmt = stmt->next) {
+                    rc = sem2_visit_statement_node(table, stmt);
+                    if (rc != SUCCESS) {
+                        sem_scope_leave_block(table, "setter body");
+                        return rc;
+                    }
+                }
+            }
+
+            sem_scope_leave_block(table, "setter body");
+            return SUCCESS;
+        }
 
         case AST_CALL_FUNCTION: {
             printf("[sem2][STMT] → CALL_FUNCTION\n");
@@ -2922,6 +3028,7 @@ static int sem2_visit_statement_node(semantic *table, ast_node node)
     printf("[sem2][STMT] → unhandled\n");
     return SUCCESS;
 }
+
 
 /* -------------------------------------------------------------------------
  *  Block visitor

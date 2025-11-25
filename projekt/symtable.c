@@ -93,7 +93,7 @@ void st_insert(symtable *table,char *key, symbol_type type, bool defined){
     place->data->ID = NULL;
     place->data->params = NULL;
     place->data->scope_name = NULL;
-    place->data->cg_name = NULL;
+    place->data->decl_node = NULL;
 }
 
 st_data *st_get(symtable *table, char *key){

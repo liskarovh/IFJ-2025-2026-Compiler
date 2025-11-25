@@ -2564,7 +2564,7 @@ int semantic_pass1(ast syntax_tree) {
 static int sem2_visit_block(semantic *table, ast_block blk);
 __attribute__((unused))
 static void sem2_debug_print_scope_locals(semantic *cxt, const char *msg)
-{ 
+{
     const char *scope = sem_scope_ids_current(&cxt->ids);
 
     printf("\n====== %s (scope=%s) ======\n", msg, scope);
@@ -2582,14 +2582,24 @@ static void sem2_debug_print_scope_locals(semantic *cxt, const char *msg)
         st_data *d = s->data;
 
         if (d->symbol_type == ST_VAR && !d->global) {
-            printf("LOCAL %-12s  cg_name = %-12s\n",
-                   s->key,
-                   d->cg_name ? d->cg_name : "(none)");
+
+            const char *cg = "(none)";
+
+            // NEW: cg_name is now stored in the AST declaration node
+            if (d->decl_node &&
+                d->decl_node->type == AST_VAR_DECLARATION) 
+            {
+                cg = d->decl_node->data.declaration.cg_name;
+                if (!cg) cg = "(none)";
+            }
+
+            printf("LOCAL %-12s  cg_name = %-12s\n", s->key, cg);
         }
     }
 
     printf("========================================\n\n");
 }
+
 
 
 /* -------------------------------------------------------------------------
@@ -2710,10 +2720,27 @@ static int sem2_visit_expr(semantic *cxt, ast_expression e)
            e->type, sem_scope_ids_current(&cxt->ids));
 
     switch (e->type) {
+case AST_IDENTIFIER: {
+    const char *name = e->operands.identifier.value;
 
-        case AST_IDENTIFIER:
-            printf("[sem2][EXPR] → IDENT '%s'\n", e->operands.identifier.value);
-            return sem2_resolve_identifier(cxt, e->operands.identifier.value);
+    // Ensure it exists
+    int rc = sem2_resolve_identifier(cxt, name);
+    if (rc != SUCCESS) return rc;
+
+    // Find symbol entry
+    st_data *sym = scopes_lookup(&cxt->scopes, name);
+    
+    if (sym && sym->decl_node) {
+        e->operands.identifier.cg_name =
+            sym->decl_node->data.declaration.cg_name;
+
+        printf("[sem2][ID] bind IDENT '%s' -> cg_name='%s'\n",
+               name, e->operands.identifier.cg_name);
+    }
+
+    return SUCCESS;
+}
+
 
         case AST_VALUE:
             printf("[sem2][EXPR] → literal value OK\n");
@@ -2887,40 +2914,29 @@ static int sem2_visit_statement_node(semantic *table, ast_node node)
         case AST_VAR_DECLARATION: {
     const char *name = node->data.declaration.name;
 
-    // 1. Declare variable in local scope
-    if (!scopes_declare_local(&table->scopes, name, true)) {
-        return error(ERR_REDEF,
-                     "variable '%s' already declared in this scope", name);
-    }
+    // Insert local variable
+    if (!scopes_declare_local(&table->scopes, name, true))
+        return error(ERR_REDEF, "variable '%s' already declared", name);
 
-    // 2. Lookup the symbol normally (Pass1 inserted it already)
-    st_data *sym = scopes_lookup(&table->scopes, name);
-    if (!sym) {
-        return error(ERR_INTERNAL,
-                     "scope lookup failed for '%s'", name);
-    }
-
-    // 3. Build scope-clean version (remove dots)
+    // Build backend name
     char scope_raw[64];
-    snprintf(scope_raw, sizeof scope_raw,
-             "%s", sem_scope_ids_current(&table->ids));
+    snprintf(scope_raw, sizeof scope_raw, "%s", sem_scope_ids_current(&table->ids));
 
     char scope_clean[64];
     int j = 0;
-    for (int i = 0; scope_raw[i] != '\0'; i++) {
-        if (scope_raw[i] != '.') {
+    for (int i = 0; scope_raw[i]; i++)
+        if (scope_raw[i] != '.')
             scope_clean[j++] = scope_raw[i];
-        }
-    }
     scope_clean[j] = '\0';
 
-    // 4. Create final cg name: "name_scopeID"
     char final[128];
     snprintf(final, sizeof final, "%s_%s", name, scope_clean);
 
-    sym->cg_name = my_strdup(final);
+   
+    node->data.declaration.cg_name = my_strdup(final);
 
-    //printf("[sem2] cg_name for '%s' => '%s'\n",name,sym->cg_name ? sym->cg_name : "(none)");
+    printf("[sem2] new local '%s' -> cg_name='%s'\n",
+           name, node->data.declaration.cg_name);
 
     return SUCCESS;
 }

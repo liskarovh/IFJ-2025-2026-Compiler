@@ -6,6 +6,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include "string.h"
+#include "ast.h"
 
 
 
@@ -41,7 +42,7 @@ typedef struct st_data{
     //functions
     int param_count;
     string *params;
-    char *cg_name;
+    ast_node decl_node;
     
     // main, block etc.
     string scope_name;

@@ -59,3 +59,8 @@ build/
 projekt/run_stx_tests.sh
 tests/
 test/python/__pycache__
+ifjMoreTests/
+projekt/ic25int-linux-x86_64
+projekt/run_cc_tests.sh
+projekt/test_out.txt
+projekt/out.txt

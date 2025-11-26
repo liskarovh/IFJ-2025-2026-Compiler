@@ -53,7 +53,7 @@ int main(void) {
     }
 
 
-    ast_print(ast_tree);
+    //ast_print(ast_tree);
 
     // ===== 4) Code generation =====
     generator gen = malloc(sizeof(*gen));
@@ -67,6 +67,7 @@ int main(void) {
     generate_code(gen, ast_tree);
     fputs(gen->output->data, stdout);
 
+    result = 0;
     // ===== 5) Cleanup =====
     free(gen);
     //ast_dispose(ast_tree);

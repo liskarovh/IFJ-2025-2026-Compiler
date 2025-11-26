@@ -13,6 +13,7 @@
 #define SYMTABLE_SIZE 16381
 
 typedef enum {
+    ST_UNKNOWN = -1,
     ST_NULL,
     ST_INT,
     ST_DOUBLE,

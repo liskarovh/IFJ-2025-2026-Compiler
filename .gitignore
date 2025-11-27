@@ -64,3 +64,6 @@ projekt/ic25int-linux-x86_64
 projekt/test_out.txt
 projekt/out.txt
 test/python/__pycache__
+gen_tests/
+projekt/run_gen_tests.sh
+compiler

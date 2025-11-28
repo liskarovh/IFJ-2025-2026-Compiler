@@ -2690,11 +2690,32 @@ static int sem2_visit_expr(semantic *cxt, ast_expression e, data_type *out_type)
                 return rc;
             }
 
-            st_data *sym = scopes_lookup(&cxt->scopes, name);
-            if (sym && sym->decl_node && sym->decl_node->type == AST_VAR_DECLARATION) {
-                e->operands.identifier.cg_name = sym->decl_node->data.declaration.cg_name;
-               //printf("[sem2][ID] bind IDENT '%s' -> cg_name='%s'\n", name, e->operands.identifier.cg_name ? e->operands.identifier.cg_name : "(null)");
-            }
+             st_data *sym = scopes_lookup(&cxt->scopes, name);
+
+    
+    if (!sym) {
+        char scopedKey[128];
+        snprintf(scopedKey, sizeof scopedKey, "%s::%s",
+                 sem_scope_ids_current(&cxt->ids), name);
+
+        sym = scopes_lookup(&cxt->scopes, scopedKey);
+    }
+   
+    
+     
+    if (sym && sym->decl_node &&
+        sym->decl_node->type == AST_VAR_DECLARATION) {
+
+        e->operands.identifier.cg_name =
+            sym->decl_node->data.declaration.cg_name;
+
+        //printf("[sem2][ID] bind IDENT '%s' -> cg_name='%s'\n",name,e->operands.identifier.cg_name ?e->operands.identifier.cg_name : "(none)");
+    }
+    else if (sym && sym->params) {   // param_ptr: add this to st_data
+    e->operands.identifier.cg_name = sym->decl_node->data.function->parameters->cg_name;
+
+    //printf("[sem2][ID] bind IDENT '%s' -> param cg_name='%s'\n",name,e->operands.identifier.cg_name);
+}
 
             if (out_type && name) {
                 data_type t = ST_UNKNOWN;
@@ -2732,6 +2753,9 @@ static int sem2_visit_expr(semantic *cxt, ast_expression e, data_type *out_type)
                         break;
                     case AST_VALUE_STRING:
                         *out_type = ST_STRING;
+                        break;
+                    case AST_VALUE_NULL:
+                        *out_type = ST_NULL;
                         break;
                     default:
                         *out_type = ST_UNKNOWN;
@@ -3126,7 +3150,8 @@ static int sem2_visit_statement_node(semantic *table, ast_node node) {
             if (!sym) {
                 return error(ERR_INTERNAL, "scope lookup failed for '%s'", name);
             }
-
+            // creating cg_name
+            
             char scope_raw[64];
             const char *scope_src = sem_scope_ids_current(&table->ids);
             size_t scope_len = strlen(scope_src);
@@ -3140,7 +3165,7 @@ static int sem2_visit_statement_node(semantic *table, ast_node node) {
             int j = 0;
             for (int i = 0; scope_raw[i] != '\0'; i++) {
                 if (scope_raw[i] != '.') {
-                    if (j + 1 >= (int)sizeof scope_clean) {
+                    if (j + 1 >= (int)sizeof scope_clean -1) {
                         break;
                     }
                     scope_clean[j++] = scope_raw[i];
@@ -3175,7 +3200,13 @@ static int sem2_visit_statement_node(semantic *table, ast_node node) {
 
             final[pos] = '\0';
 
+            if (node->data.declaration.cg_name) {
+            free(node->data.declaration.cg_name);
+             }
             node->data.declaration.cg_name = my_strdup(final);
+            if (!node->data.declaration.cg_name) {
+            return error(ERR_INTERNAL, "memory allocation failed for cg_name");
+        }
             sym->decl_node = node;
 
            //printf("[sem2] new local '%s' -> cg_name='%s'\n", name, node->data.declaration.cg_name ? node->data.declaration.cg_name : "(null)");
@@ -3211,6 +3242,22 @@ static int sem2_visit_statement_node(semantic *table, ast_node node) {
                 sem_magic_global_type_learn(lhs, rhs_type);
             } else {
                 st_data *sym = scopes_lookup(&table->scopes, lhs);
+                //cg_name  
+                if (sym && sym->decl_node && sym->decl_node->type == AST_VAR_DECLARATION){
+                    
+                    const char *decl_cg = sym->decl_node->data.declaration.cg_name;
+                    if (decl_cg) {
+                        
+                        if (node->data.assignment.cg_name) {
+                            free(node->data.assignment.cg_name);
+                        }
+                        
+                        node->data.assignment.cg_name = my_strdup(decl_cg);
+                        if (!node->data.assignment.cg_name) {
+                            return error(ERR_INTERNAL, "memory allocation failed for assignment cg_name");
+                        }
+                    }
+                }
                 if (sym && (sym->symbol_type == ST_VAR || sym->symbol_type == ST_PAR)) {
                     data_type old_t = sym->data_type;
                     data_type new_t = old_t;
@@ -3250,6 +3297,41 @@ static int sem2_visit_statement_node(semantic *table, ast_node node) {
             if (rc != SUCCESS) {
                 sem_scope_leave_block(table, "function params");
                 return rc;
+            }
+            //cg_name
+            const char *scope_str = sem_scope_ids_current(&table->ids);
+            char clean[64];
+            int j = 0;
+            for (int i = 0; scope_str[i] != '\0'; i++) {
+                if (scope_str[i] != '.' && j < 63)
+                    clean[j++] = scope_str[i];
+            }
+            clean[j] = '\0';
+
+            for (ast_parameter p = fn->parameters; p; p = p->next) {
+
+                if (p->value_type != AST_VALUE_IDENTIFIER)
+                    continue;
+
+                const char *pname = p->value.string_value;
+                if (!pname)
+                    continue;
+
+                st_data *sym = scopes_lookup(&table->scopes, pname);
+                if (!sym || !sym->decl_node)
+                    continue;
+
+               
+                char final[128];
+                snprintf(final, sizeof(final), "%s_%s", pname, clean);
+
+            
+                p->cg_name = my_strdup(final);
+
+              
+                sym->decl_node->data.declaration.cg_name = p->cg_name;
+
+                //printf("[sem2] param '%s' -> cg_name='%s'\n", pname, p->cg_name);
             }
 
             if (fn->code) {
@@ -3394,7 +3476,39 @@ static int sem2_visit_statement_node(semantic *table, ast_node node) {
             if (rc != SUCCESS) {
                 return rc;
             }
+            //cg_name
+            for (ast_parameter p = call->parameters; p; p = p->next) {
 
+    // Only IDENTIFIER parameters have a name!
+    if (p->value_type != AST_VALUE_IDENTIFIER)
+        continue;
+
+    const char *pname = p->value.string_value;
+    if (!pname) 
+        continue;
+
+    
+    st_data *sym = scopes_lookup(&table->scopes, pname);
+    if (!sym) 
+        continue;
+
+    
+    const char *scope_str = sem_scope_ids_current(&table->ids);
+
+    char clean[64];
+    int j = 0;
+    for (int i = 0; scope_str[i] != '\0'; i++) {
+        if (scope_str[i] != '.' && j < 63)
+            clean[j++] = scope_str[i];
+    }
+    clean[j] = '\0';
+
+    char final[128];
+    snprintf(final, sizeof(final), "%s_%s", pname, clean);
+
+    p->cg_name = my_strdup(final);
+}
+    
             for (ast_parameter p = call->parameters; p; p = p->next) {
                 if (p->value_type == AST_VALUE_IDENTIFIER) {
                     rc = sem2_resolve_identifier(table, p->value.string_value);
@@ -3406,7 +3520,7 @@ static int sem2_visit_statement_node(semantic *table, ast_node node) {
             return SUCCESS;
         }
     }
-
+    
    //printf("[sem2][STMT] → unhandled\n");
     return SUCCESS;
 }

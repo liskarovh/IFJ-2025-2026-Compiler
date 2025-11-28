@@ -71,6 +71,7 @@ typedef struct ast_parameter {
         double double_value;
         char *string_value;
     } value;
+    char *cg_name;
     struct ast_parameter *next;
 } *ast_parameter;
 
@@ -132,6 +133,8 @@ typedef struct ast_node {
 
         struct ast_assignment {
             char *name;
+            char *cg_name;
+
             struct ast_expression *value;
         } assignment;
 

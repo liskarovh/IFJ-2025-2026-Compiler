@@ -59,6 +59,7 @@ build/
 projekt/run_stx_tests.sh
 tests/
 ifjMoreTests/
+exampleCodesIFJ25/
 projekt/run_cc_tests.sh
 projekt/ic25int-linux-x86_64
 projekt/test_out.txt

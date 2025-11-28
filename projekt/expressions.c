@@ -74,6 +74,7 @@ prec_table_enum token_to_expr(tokenPtr token) {
         case T_INT: return INT;
         case T_FLOAT: return FLOAT;
         case T_STRING: return STRING;
+        case T_ML_STRING: return STRING;
         case T_IDENT: return ID;
         case T_GLOB_IDENT: return ID;
         case T_KW_NUM: return ID;
@@ -310,6 +311,7 @@ int parse_expr(DLListTokens *tokenlist, ast_expression *out_ast){
                 }
             }
             if (input == ID && tokenlist->active->next != NULL && tokenlist->active->next->token->type == T_LPAREN) {
+                printf("FUN CALL");
                 expr_item item;
                 item.symbol = input;
                 item.token = NULL;

@@ -3,8 +3,11 @@
 
 
 char *my_strdup(const char *s) {
-    char *dup = malloc(strlen(s) + 1);
-    if (dup) strcpy(dup, s);
+    if (!s) return NULL;
+    size_t len = strlen(s) + 1;
+    char *dup = malloc(len);
+    if (!dup) return NULL;
+    memcpy(dup, s, len);
     return dup;
 }
 

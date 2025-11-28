@@ -73,6 +73,7 @@ void ast_block_parent(ast_class *class_node) {
 void ast_add_new_node(ast_class *class_node, enum ast_node_type type) {
     ast_node new_node = malloc(sizeof(struct ast_node));
     new_node->type = type;
+    new_node->next = NULL;
 
     if((*class_node)->current->current == NULL) {
         (*class_node)->current->first = new_node;
@@ -124,10 +125,12 @@ void ast_add_new_node(ast_class *class_node, enum ast_node_type type) {
         break;
     case AST_VAR_DECLARATION: 
         new_node->data.declaration.name = NULL;
+        new_node->data.declaration.cg_name = NULL;
         break;
     case AST_ASSIGNMENT: 
         new_node->data.assignment.name = NULL;
         new_node->data.assignment.value = NULL;
+        new_node->data.assignment.cg_name = NULL;
         break;
     case AST_FUNCTION: 
         new_node->data.function = malloc(sizeof(struct ast_function));
@@ -235,15 +238,29 @@ void ast_node_dispose(ast_node node) {
         ast_expression_dispose(node->data.expression);
         break;
     case AST_VAR_DECLARATION:
+    if (node->data.declaration.name) {
+        free(node->data.declaration.name);
+    }
+    if (node->data.declaration.cg_name) {
+        free(node->data.declaration.cg_name);
+    }
         break;
     case AST_ASSIGNMENT:
+    if (node->data.assignment.name) {
+        free(node->data.assignment.name);
+    }
+    if (node->data.assignment.cg_name) {
+        free(node->data.assignment.cg_name);
+    }
         ast_expression_dispose(node->data.assignment.value);
         break;
     case AST_FUNCTION: {
+        if (node->data.function->name) free(node->data.function->name);
         ast_parameter param = node->data.function->parameters;
         ast_parameter temp;
         while(param != NULL) {
             temp = param->next;
+            if (param->cg_name) free(param->cg_name);
             free(param);
             param = temp;
         }
@@ -252,10 +269,12 @@ void ast_node_dispose(ast_node node) {
         break;
     }
     case AST_CALL_FUNCTION: {
+        if (node->data.function_call->name) free(node->data.function_call->name);
         ast_parameter param = node->data.function_call->parameters;
         ast_parameter temp;
         while(param != NULL) {
             temp = param->next;
+            free(param->cg_name);
             free(param);
             param = temp;
         }
@@ -271,6 +290,7 @@ void ast_node_dispose(ast_node node) {
         ast_block_dispose(node->data.setter.body);
         break;
     case AST_IFJ_FUNCTION: {
+        if (node->data.ifj_function->name) free(node->data.ifj_function->name);
         ast_parameter param = node->data.ifj_function->parameters;
         while(param != NULL) {
             ast_parameter to_free = param;
@@ -295,7 +315,6 @@ void ast_expression_dispose(ast_expression expr) {
         ast_expression_dispose(expr->operands.binary_op.right);
         return;
     } 
-
     free(expr);
 }
 

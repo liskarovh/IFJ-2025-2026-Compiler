@@ -94,6 +94,7 @@ typedef struct ast_expression {
         } identity;
         struct ast_identifier {
             char *value;
+            char *cg_name;
         } identifier;
         struct ast_fun_call *function_call;
         struct ast_ifj_function *ifj_function;
@@ -126,6 +127,7 @@ typedef struct ast_node {
 
         struct ast_declaration {
             char *name;
+            char *cg_name;
         } declaration;
 
         struct ast_assignment {

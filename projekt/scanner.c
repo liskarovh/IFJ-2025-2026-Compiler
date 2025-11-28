@@ -567,30 +567,39 @@ int get_next_token(tokenPtr out)
                 bool is_float_number = false;
 
                 // Optional fractional part: '.' DIGIT+
-                if (is_dot(look_ahead())) {
-                    get_char();  // consume '.'
+                int la1 = look_ahead();
+                if (is_dot(la1)) {
+                    // Temporarily consume the first '.'
+                    get_char();
+                    int la2 = look_ahead();
 
-                    // At least one digit must follow '.'
-                    if (!is_digit(look_ahead())) {
-                        string_destroy(num);
-                        return error(ERR_LEX, "Digit required after decimal point");
-                    }
+                    if (la2 == '.') {
+                        // Pattern ".." or "..." is a range operator,
+                        unget_char('.');
+                    } else {
+                        // Real decimal point: a digit must follow
+                        if (!is_digit(la2)) {
+                            string_destroy(num);
+                            return error(ERR_LEX, "Digit required after decimal point");
+                        }
 
-                    // Append '.' to buffer so strtod sees the dot
-                    if (!string_append_char(num, '.')) {
-                        string_destroy(num);
-                        return error(ERR_INTERNAL, "Out of memory in scanner");
-                    }
-
-                    while (is_digit(look_ahead())) {
-                        int digit_char = get_char();
-                        if (!string_append_char(num, (char)digit_char)) {
+                        // Append '.' to buffer
+                        if (!string_append_char(num, '.')) {
                             string_destroy(num);
                             return error(ERR_INTERNAL, "Out of memory in scanner");
                         }
-                    }
 
-                    is_float_number = true;
+                        // Consume digits after '.'
+                        while (is_digit(look_ahead())) {
+                            int digit_char = get_char();
+                            if (!string_append_char(num, (char)digit_char)) {
+                                string_destroy(num);
+                                return error(ERR_INTERNAL, "Out of memory in scanner");
+                            }
+                        }
+
+                        is_float_number = true;
+                    }
                 }
 
                 // Optional exponent: 'e'/'E' ['+'|'-'] DIGIT+

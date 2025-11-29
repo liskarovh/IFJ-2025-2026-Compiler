@@ -112,7 +112,7 @@ static const builtin_row g_rows[] = {
     { "Ifj.read_bool", 0,
       { BUILTIN_PARAM_ANY,     BUILTIN_PARAM_ANY,     BUILTIN_PARAM_ANY },
       ST_BOOL,     // Bool nebo Null, staticky bereme Bool
-      true,  false },  /* BOOLTHEN */
+      false,  false },  /* BOOLTHEN */
 
     { "Ifj.is_int",    1,
       { BUILTIN_PARAM_ANY,     BUILTIN_PARAM_ANY,     BUILTIN_PARAM_ANY },

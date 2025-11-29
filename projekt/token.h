@@ -53,31 +53,31 @@ typedef enum {
     T_BOOL_FALSE,
 
     // operators
-    T_PLUS,     // +
-    T_MINUS,    // -
-    T_MUL,      // *
-    T_DIV,      // /
-    T_LT,       // <
-    T_LE,       // <=
-    T_GT,       // >
-    T_GE,       // >=
-    T_EQ,       // ==
-    T_NEQ,      // !=
-    T_AND,      // &&
-    T_OR,       // ||
-    T_NOT,      // !
-    T_ASSIGN,   // =
-    T_LPAREN,   // (
-    T_RPAREN,   // )
-    T_LBRACE,   // {
-    T_RBRACE,   // }
-    T_COMMA,    // ,
-    T_DOT,      // .
+    T_PLUS, // +
+    T_MINUS, // -
+    T_MUL, // *
+    T_DIV, // /
+    T_LT, // <
+    T_LE, // <=
+    T_GT, // >
+    T_GE, // >=
+    T_EQ, // ==
+    T_NEQ, // !=
+    T_AND, // &&
+    T_OR, // ||
+    T_NOT, // !
+    T_ASSIGN, // =
+    T_LPAREN, // (
+    T_RPAREN, // )
+    T_LBRACE, // {
+    T_RBRACE, // }
+    T_COMMA, // ,
+    T_DOT, // .
     T_RANGE_INC, // ..
     T_RANGE_EXC, // ...
-    T_COLON,    // :
-    T_QUESTION  // ?
-    } token_type;
+    T_COLON, // :
+    T_QUESTION // ?
+} token_type;
 
 
 /// @brief structure for the token
@@ -107,16 +107,14 @@ void token_clear(tokenPtr t);
 void token_destroy(tokenPtr);
 
 /// @brief Structure for the element of the list of tokens
-typedef struct DLLTokenElement
-{
+typedef struct DLLTokenElement {
     tokenPtr token;
     struct DLLTokenElement *next;
     struct DLLTokenElement *prev;
 } *DLLTokenElementPtr;
 
 /// @brief Structure for the list of tokens
-typedef struct
-{
+typedef struct {
     // Pointer to the first element
     DLLTokenElementPtr first;
     // Pointer to the last element

@@ -133,12 +133,12 @@ static void sem_debug_print_magic_globals(void) {
  * for this compilation model.
  */
 typedef struct {
-    char  **items;
+    char **items;
     size_t count;
     size_t capacity;
 } sem_magic_globals;
 
-static sem_magic_globals g_magic_globals = { NULL, 0, 0 };
+static sem_magic_globals g_magic_globals = {NULL, 0, 0};
 
 /**
  * @brief Internal entry describing a learned type for a magic global variable.
@@ -147,7 +147,7 @@ static sem_magic_globals g_magic_globals = { NULL, 0, 0 };
  * of magic globals such as "__foo". Code generation does not depend on it.
  */
 typedef struct {
-    char     *name;
+    char *name;
     data_type type;
 } sem_magic_global_type;
 
@@ -346,7 +346,7 @@ static void sem_uint_to_dec(char *buffer, size_t buffer_size, unsigned int value
         if (pos == 0) {
             break;
         }
-        temp[--pos] = (char)('0' + (value % 10));
+        temp[--pos] = (char) ('0' + (value % 10));
         value /= 10;
     } while (value > 0);
 
@@ -430,7 +430,7 @@ static void sem_scope_ids_enter_child(sem_scope_id_stack *scope_id_stack) {
         current_frame->path[pos] = '\0';
 
         char index_buffer[16];
-        sem_uint_to_dec(index_buffer, sizeof index_buffer, (unsigned int)child_index);
+        sem_uint_to_dec(index_buffer, sizeof index_buffer, (unsigned int) child_index);
         size_t index_length = strlen(index_buffer);
         size_t remaining = SEM_MAX_SCOPE_PATH - 1 - pos;
         if (index_length > remaining) {
@@ -491,17 +491,18 @@ static const char *sem_scope_ids_current(const sem_scope_id_stack *scope_id_stac
  * @param dtype Symbol data type (if available).
  * @return SUCCESS or ERR_INTERNAL on failure.
  */
-static int symtab_insert_with_key(semantic *semantic_table, const char *symbol_key, symbol_type symbol_kind, const char *identifier_name, const char *scope_string, int arity, data_type dtype) {
+static int symtab_insert_with_key(semantic *semantic_table, const char *symbol_key, symbol_type symbol_kind,
+                                  const char *identifier_name, const char *scope_string, int arity, data_type dtype) {
     if (!semantic_table || !semantic_table->symtab || !symbol_key) {
         return SUCCESS;
     }
 
-    if (st_find(semantic_table->symtab, (char *)symbol_key)) {
+    if (st_find(semantic_table->symtab, (char *) symbol_key)) {
         return SUCCESS;
     }
 
-    st_insert(semantic_table->symtab, (char *)symbol_key, symbol_kind, true);
-    st_data *symbol_data = st_get(semantic_table->symtab, (char *)symbol_key);
+    st_insert(semantic_table->symtab, (char *) symbol_key, symbol_kind, true);
+    st_data *symbol_data = st_get(semantic_table->symtab, (char *) symbol_key);
     if (!symbol_data) {
         return error(ERR_INTERNAL, "symtab: st_get failed for key '%s'", symbol_key);
     }
@@ -514,7 +515,7 @@ static int symtab_insert_with_key(semantic *semantic_table, const char *symbol_k
 
     if (identifier_name) {
         symbol_data->ID = string_create(0);
-        if (!symbol_data->ID || !string_append_literal(symbol_data->ID, (char *)identifier_name)) {
+        if (!symbol_data->ID || !string_append_literal(symbol_data->ID, (char *) identifier_name)) {
             return error(ERR_INTERNAL, "symtab: failed to store ID '%s'", identifier_name);
         }
     } else {
@@ -523,7 +524,7 @@ static int symtab_insert_with_key(semantic *semantic_table, const char *symbol_k
 
     const char *scope_text = scope_string ? scope_string : "global";
     symbol_data->scope_name = string_create(0);
-    if (!symbol_data->scope_name || !string_append_literal(symbol_data->scope_name, (char *)scope_text)) {
+    if (!symbol_data->scope_name || !string_append_literal(symbol_data->scope_name, (char *) scope_text)) {
         return error(ERR_INTERNAL, "symtab: failed to store scope_name '%s'", scope_text);
     }
 
@@ -544,7 +545,8 @@ static int symtab_insert_with_key(semantic *semantic_table, const char *symbol_k
  * @param dtype Data type of the symbol.
  * @return SUCCESS or ERR_INTERNAL on failure.
  */
-static int symtab_insert_symbol(semantic *semantic_table, symbol_type symbol_kind, const char *identifier_name, int arity, data_type dtype) {
+static int symtab_insert_symbol(semantic *semantic_table, symbol_type symbol_kind, const char *identifier_name,
+                                int arity, data_type dtype) {
     if (!semantic_table || !semantic_table->symtab || !identifier_name) {
         return SUCCESS;
     }
@@ -599,7 +601,8 @@ static int symtab_insert_symbol(semantic *semantic_table, symbol_type symbol_kin
  * @param dtype Data type of the accessor.
  * @return SUCCESS or ERR_INTERNAL on failure.
  */
-static int symtab_insert_accessor_symbol(semantic *semantic_table, bool is_setter, const char *base_name, int arity, data_type dtype) {
+static int symtab_insert_accessor_symbol(semantic *semantic_table, bool is_setter, const char *base_name, int arity,
+                                         data_type dtype) {
     if (!semantic_table || !semantic_table->symtab || !base_name) {
         return SUCCESS;
     }
@@ -649,7 +652,8 @@ static int symtab_insert_accessor_symbol(semantic *semantic_table, bool is_sette
     symbol_key[pos] = '\0';
 
     symbol_type accessor_symbol_type = is_setter ? ST_SETTER : ST_GETTER;
-    return symtab_insert_with_key(semantic_table, symbol_key, accessor_symbol_type, base_name, scope_text, arity, dtype);
+    return symtab_insert_with_key(semantic_table, symbol_key, accessor_symbol_type, base_name, scope_text, arity,
+                                  dtype);
 }
 
 /* =========================================================================
@@ -683,7 +687,7 @@ static void make_function_key(char *buffer, size_t buffer_size, const char *func
     if (pos < max_total) {
         buffer[pos++] = '#';
         char number_buffer[32];
-        sem_uint_to_dec(number_buffer, sizeof number_buffer, (unsigned int)arity);
+        sem_uint_to_dec(number_buffer, sizeof number_buffer, (unsigned int) arity);
         size_t num_len = strlen(number_buffer);
         size_t remaining = max_total - pos;
         if (num_len > remaining) {
@@ -851,7 +855,7 @@ static bool sem_has_accessor(semantic *semantic_table, const char *base_name, bo
 
     char key[256];
     make_accessor_key(key, sizeof key, base_name, is_setter);
-    return st_find(semantic_table->funcs, (char *)key) != NULL;
+    return st_find(semantic_table->funcs, (char *) key) != NULL;
 }
 
 /**
@@ -914,11 +918,12 @@ static int collect_headers_from_block(semantic *semantic_table, ast_block block_
  * @param class_scope_name Name of the class scope.
  * @return SUCCESS or an error code (ERR_REDEF, ERR_INTERNAL).
  */
-static int function_table_insert_signature(semantic *semantic_table, const char *function_name, int arity, const char *class_scope_name) {
+static int function_table_insert_signature(semantic *semantic_table, const char *function_name, int arity,
+                                           const char *class_scope_name) {
     char function_key[256];
     make_function_key(function_key, sizeof function_key, function_name, arity);
 
-    st_data *existing = st_get(semantic_table->funcs, (char *)function_key);
+    st_data *existing = st_get(semantic_table->funcs, (char *) function_key);
     if (existing) {
         const char *existing_scope = NULL;
         if (existing->scope_name && existing->scope_name->data && existing->scope_name->length > 0) {
@@ -937,8 +942,8 @@ static int function_table_insert_signature(semantic *semantic_table, const char 
 
     //fprintf(stdout, "[sem] insert function signature: %s (class=%s)\n", function_key, class_scope_name ? class_scope_name : "(null)");
 
-    st_insert(semantic_table->funcs, (char *)function_key, ST_FUN, true);
-    st_data *function_data = st_get(semantic_table->funcs, (char *)function_key);
+    st_insert(semantic_table->funcs, (char *) function_key, ST_FUN, true);
+    st_data *function_data = st_get(semantic_table->funcs, (char *) function_key);
     if (!function_data) {
         return error(ERR_INTERNAL, "failed to store function signature: %s", function_key);
     }
@@ -950,8 +955,10 @@ static int function_table_insert_signature(semantic *semantic_table, const char 
 
     if (class_scope_name) {
         function_data->scope_name = string_create(0);
-        if (!function_data->scope_name || !string_append_literal(function_data->scope_name, (char *)class_scope_name)) {
-            return error(ERR_INTERNAL, "failed to store function scope_name for '%s'", function_name ? function_name : "(null)");
+        if (!function_data->scope_name || !
+            string_append_literal(function_data->scope_name, (char *) class_scope_name)) {
+            return error(ERR_INTERNAL, "failed to store function scope_name for '%s'",
+                         function_name ? function_name : "(null)");
         }
     } else {
         function_data->scope_name = NULL;
@@ -959,7 +966,7 @@ static int function_table_insert_signature(semantic *semantic_table, const char 
 
     if (function_name) {
         function_data->ID = string_create(0);
-        if (!function_data->ID || !string_append_literal(function_data->ID, (char *)function_name)) {
+        if (!function_data->ID || !string_append_literal(function_data->ID, (char *) function_name)) {
             return error(ERR_INTERNAL, "failed to store function name (ID) for '%s'", function_name);
         }
     } else {
@@ -970,9 +977,9 @@ static int function_table_insert_signature(semantic *semantic_table, const char 
         char any_key[256];
         make_function_any_key(any_key, sizeof any_key, function_name);
 
-        if (!st_find(semantic_table->funcs, (char *)any_key)) {
-            st_insert(semantic_table->funcs, (char *)any_key, ST_FUN, true);
-            st_data *any_data = st_get(semantic_table->funcs, (char *)any_key);
+        if (!st_find(semantic_table->funcs, (char *) any_key)) {
+            st_insert(semantic_table->funcs, (char *) any_key, ST_FUN, true);
+            st_data *any_data = st_get(semantic_table->funcs, (char *) any_key);
             if (any_data) {
                 any_data->symbol_type = ST_FUN;
                 any_data->param_count = 0;
@@ -1005,13 +1012,14 @@ static int function_table_insert_signature(semantic *semantic_table, const char 
  * @param setter_param_opt Optional name of the setter parameter (unused in Pass 1).
  * @return SUCCESS or an error code (ERR_REDEF, ERR_INTERNAL).
  */
-static int function_table_insert_accessor(semantic *semantic_table, const char *base_name, bool is_setter, const char *class_scope_name, const char *setter_param_opt) {
-    (void)setter_param_opt;
+static int function_table_insert_accessor(semantic *semantic_table, const char *base_name, bool is_setter,
+                                          const char *class_scope_name, const char *setter_param_opt) {
+    (void) setter_param_opt;
 
     char accessor_key[256];
     make_accessor_key(accessor_key, sizeof accessor_key, base_name, is_setter);
 
-    st_data *existing = st_get(semantic_table->funcs, (char *)accessor_key);
+    st_data *existing = st_get(semantic_table->funcs, (char *) accessor_key);
     if (existing) {
         const char *existing_scope = NULL;
         if (existing->scope_name && existing->scope_name->data && existing->scope_name->length > 0) {
@@ -1021,7 +1029,11 @@ static int function_table_insert_accessor(semantic *semantic_table, const char *
         const char *new_scope = class_scope_name;
 
         if (existing_scope && new_scope && strcmp(existing_scope, new_scope) == 0) {
-            return error(ERR_REDEF, is_setter ? "duplicate setter for '%s' in class '%s'" : "duplicate getter for '%s' in class '%s'", base_name ? base_name : "(null)", existing_scope);
+            return error(
+                ERR_REDEF, is_setter
+                               ? "duplicate setter for '%s' in class '%s'"
+                               : "duplicate getter for '%s' in class '%s'", base_name ? base_name : "(null)",
+                existing_scope);
         }
 
         //fprintf(stdout, "[sem] accessor %s for base '%s' already exists in class '%s', new class '%s' allowed.\n", is_setter ? "setter" : "getter", base_name ? base_name : "(null)", existing_scope ? existing_scope : "(none)", new_scope ? new_scope : "(none)");
@@ -1030,8 +1042,8 @@ static int function_table_insert_accessor(semantic *semantic_table, const char *
 
     //fprintf(stdout, "[sem] insert %s for '%s' as %s (class=%s)\n", is_setter ? "setter" : "getter", base_name ? base_name : "(null)", accessor_key, class_scope_name ? class_scope_name : "(null)");
 
-    st_insert(semantic_table->funcs, (char *)accessor_key, ST_FUN, true);
-    st_data *accessor_data = st_get(semantic_table->funcs, (char *)accessor_key);
+    st_insert(semantic_table->funcs, (char *) accessor_key, ST_FUN, true);
+    st_data *accessor_data = st_get(semantic_table->funcs, (char *) accessor_key);
     if (!accessor_data) {
         return error(ERR_INTERNAL, "failed to store accessor signature: %s", accessor_key);
     }
@@ -1043,8 +1055,10 @@ static int function_table_insert_accessor(semantic *semantic_table, const char *
 
     if (class_scope_name) {
         accessor_data->scope_name = string_create(0);
-        if (!accessor_data->scope_name || !string_append_literal(accessor_data->scope_name, (char *)class_scope_name)) {
-            return error(ERR_INTERNAL, "failed to store accessor scope_name for '%s'", base_name ? base_name : "(null)");
+        if (!accessor_data->scope_name || !
+            string_append_literal(accessor_data->scope_name, (char *) class_scope_name)) {
+            return error(ERR_INTERNAL, "failed to store accessor scope_name for '%s'",
+                         base_name ? base_name : "(null)");
         }
     } else {
         accessor_data->scope_name = NULL;
@@ -1052,7 +1066,7 @@ static int function_table_insert_accessor(semantic *semantic_table, const char *
 
     if (base_name) {
         accessor_data->ID = string_create(0);
-        if (!accessor_data->ID || !string_append_literal(accessor_data->ID, (char *)base_name)) {
+        if (!accessor_data->ID || !string_append_literal(accessor_data->ID, (char *) base_name)) {
             return error(ERR_INTERNAL, "failed to store accessor base (ID) for '%s'", base_name);
         }
     } else {
@@ -1104,7 +1118,7 @@ static bool function_table_has_signature(semantic *semantic_table, const char *f
 
     char function_key[256];
     make_function_key(function_key, sizeof function_key, function_name, arity);
-    return st_find(semantic_table->funcs, (char *)function_key) != NULL;
+    return st_find(semantic_table->funcs, (char *) function_key) != NULL;
 }
 
 /**
@@ -1123,7 +1137,7 @@ static bool function_table_has_any_overload(semantic *semantic_table, const char
 
     char any_key[256];
     make_function_any_key(any_key, sizeof any_key, function_name);
-    return st_find(semantic_table->funcs, (char *)any_key) != NULL;
+    return st_find(semantic_table->funcs, (char *) any_key) != NULL;
 }
 
 /**
@@ -1169,7 +1183,8 @@ typedef enum {
  * @return True if the expression is an integer literal.
  */
 static bool expression_is_integer_literal(ast_expression expression_node) {
-    return expression_node && expression_node->type == AST_VALUE && expression_node->operands.identity.value_type == AST_VALUE_INT;
+    return expression_node && expression_node->type == AST_VALUE && expression_node->operands.identity.value_type ==
+           AST_VALUE_INT;
 }
 
 /**
@@ -1254,7 +1269,8 @@ static literal_kind get_expression_literal_kind(ast_expression expression_node) 
                 return LITERAL_NUMERIC;
             }
 
-            if (left_kind == LITERAL_STRING && expression_is_integer_literal(expression_node->operands.binary_op.right)) {
+            if (left_kind == LITERAL_STRING &&
+                expression_is_integer_literal(expression_node->operands.binary_op.right)) {
                 return LITERAL_STRING;
             }
 
@@ -1302,12 +1318,14 @@ static int visit_expression_node(semantic *semantic_table, ast_expression expres
  * @param right_expression Right operand expression (needed for string * int).
  * @return SUCCESS or ERR_EXPR on literal-only policy violation.
  */
-static int sem_check_literal_binary(int op, literal_kind left_kind, literal_kind right_kind, ast_expression right_expression) {
-    (void)right_expression;
+static int sem_check_literal_binary(int op, literal_kind left_kind, literal_kind right_kind,
+                                    ast_expression right_expression) {
+    (void) right_expression;
 
     if (op == AST_ADD) {
         if (left_kind && right_kind) {
-            bool ok = (left_kind == LITERAL_NUMERIC && right_kind == LITERAL_NUMERIC) || (left_kind == LITERAL_STRING && right_kind == LITERAL_STRING);
+            bool ok = (left_kind == LITERAL_NUMERIC && right_kind == LITERAL_NUMERIC) || (
+                          left_kind == LITERAL_STRING && right_kind == LITERAL_STRING);
             if (!ok) {
                 return error(ERR_EXPR, "invalid literal '+' operands");
             }
@@ -1320,7 +1338,8 @@ static int sem_check_literal_binary(int op, literal_kind left_kind, literal_kind
         }
     } else if (op == AST_MUL) {
         if (left_kind && right_kind) {
-            bool ok = (left_kind == LITERAL_NUMERIC && right_kind == LITERAL_NUMERIC) || (left_kind == LITERAL_STRING && expression_is_integer_literal(right_expression));
+            bool ok = (left_kind == LITERAL_NUMERIC && right_kind == LITERAL_NUMERIC) || (
+                          left_kind == LITERAL_STRING && expression_is_integer_literal(right_expression));
             if (!ok) {
                 return error(ERR_EXPR, "invalid literal '*' operands");
             }
@@ -1364,7 +1383,8 @@ static param_kind sem_get_param_literal_kind(ast_parameter param) {
         return PARAM_KIND_UNKNOWN;
     }
 
-    if ((param->value_type == AST_VALUE_STRING || param->value_type == AST_VALUE_IDENTIFIER) && param->value.string_value && param->value.string_value[0] == '_' && param->value.string_value[1] == '_') {
+    if ((param->value_type == AST_VALUE_STRING || param->value_type == AST_VALUE_IDENTIFIER) && param->value.
+        string_value && param->value.string_value[0] == '_' && param->value.string_value[1] == '_') {
         return PARAM_KIND_UNKNOWN;
     }
 
@@ -1544,7 +1564,7 @@ static int sem_visit_binary_expr(semantic *semantic_table, ast_expression expres
     literal_kind left_kind = get_expression_literal_kind(left_expression);
     literal_kind right_kind = get_expression_literal_kind(right_expression);
 
-    return sem_check_literal_binary((int)expression_node->type, left_kind, right_kind, right_expression);
+    return sem_check_literal_binary((int) expression_node->type, left_kind, right_kind, right_expression);
 }
 
 /**
@@ -1616,7 +1636,7 @@ static int visit_expression_node(semantic *semantic_table, ast_expression expres
  * @param user_data Semantic context.
  */
 static void sem_copy_builtin_cb(const char *key, st_data *data, void *user_data) {
-    semantic *semantic_table = (semantic *)user_data;
+    semantic *semantic_table = (semantic *) user_data;
     if (!semantic_table || !key || !data) {
         return;
     }
@@ -1626,7 +1646,7 @@ static void sem_copy_builtin_cb(const char *key, st_data *data, void *user_data)
     }
 
     const char *hash_position = strchr(key, '#');
-    size_t base_name_length = hash_position ? (size_t)(hash_position - key) : strlen(key);
+    size_t base_name_length = hash_position ? (size_t) (hash_position - key) : strlen(key);
 
     char builtin_name_buffer[128];
     if (base_name_length >= sizeof(builtin_name_buffer)) {
@@ -1659,6 +1679,7 @@ static void sem_copy_builtins_to_symbol_table(semantic *semantic_table) {
  * ========================================================================= */
 
 static int visit_block_node(semantic *semantic_table, ast_block block_node);
+
 static int visit_statement_node(semantic *semantic_table, ast_node node);
 
 /**
@@ -1834,7 +1855,7 @@ static int sem_handle_function_node(semantic *semantic_table, ast_node node) {
 
     result_code = declare_parameter_list_in_current_scope(semantic_table, function_node->parameters);
     if (result_code != SUCCESS) {
-        (void)sem_scope_leave_block(semantic_table, "sem_handle_function_node (params)");
+        (void) sem_scope_leave_block(semantic_table, "sem_handle_function_node (params)");
         //fprintf(stdout, "[sem] scope POP (func=%s, early error)\n", fname);
         return result_code;
     }
@@ -1843,7 +1864,7 @@ static int sem_handle_function_node(semantic *semantic_table, ast_node node) {
         for (ast_node stmt = function_node->code->first; stmt; stmt = stmt->next) {
             result_code = visit_statement_node(semantic_table, stmt);
             if (result_code != SUCCESS) {
-                (void)sem_scope_leave_block(semantic_table, "sem_handle_function_node (body)");
+                (void) sem_scope_leave_block(semantic_table, "sem_handle_function_node (body)");
                 //fprintf(stdout, "[sem] scope POP (func=%s, early error)\n", fname);
                 return result_code;
             }
@@ -1869,29 +1890,29 @@ static int sem_handle_getter_node(semantic *semantic_table, ast_node node) {
     //const char *name = node->data.getter.name;
     //const char *gname = name ? name : "(null)";
 
-   //fprintf(stdout, "[sem] getter body: %s (scope=%s)\n", gname, sem_scope_ids_current(&semantic_table->ids));
+    //fprintf(stdout, "[sem] getter body: %s (scope=%s)\n", gname, sem_scope_ids_current(&semantic_table->ids));
 
     int result_code = symtab_insert_accessor_symbol(semantic_table, false, node->data.getter.name, 0, ST_VOID);
     if (result_code != SUCCESS) {
         return result_code;
     }
 
-   //fprintf(stdout, "[sem] scope PUSH (getter=%s)\n", gname);
+    //fprintf(stdout, "[sem] scope PUSH (getter=%s)\n", gname);
     sem_scope_enter_block(semantic_table);
 
     if (node->data.getter.body) {
         for (ast_node stmt = node->data.getter.body->first; stmt; stmt = stmt->next) {
             result_code = visit_statement_node(semantic_table, stmt);
             if (result_code != SUCCESS) {
-                (void)sem_scope_leave_block(semantic_table, "sem_handle_getter_node (body)");
-               //fprintf(stdout, "[sem] scope POP (getter=%s, early error)\n", gname);
+                (void) sem_scope_leave_block(semantic_table, "sem_handle_getter_node (body)");
+                //fprintf(stdout, "[sem] scope POP (getter=%s, early error)\n", gname);
                 return result_code;
             }
         }
     }
 
     result_code = sem_scope_leave_block(semantic_table, "sem_handle_getter_node");
-   //fprintf(stdout, "[sem] scope POP (getter=%s)\n", gname);
+    //fprintf(stdout, "[sem] scope POP (getter=%s)\n", gname);
     return result_code;
 }
 
@@ -1910,19 +1931,19 @@ static int sem_handle_setter_node(semantic *semantic_table, ast_node node) {
     const char *param_name = node->data.setter.param;
     //const char *sname = base_name ? base_name : "(null)";
 
-   //fprintf(stdout, "[sem] setter body: %s (scope=%s)\n", sname, sem_scope_ids_current(&semantic_table->ids));
+    //fprintf(stdout, "[sem] setter body: %s (scope=%s)\n", sname, sem_scope_ids_current(&semantic_table->ids));
 
     int result_code = symtab_insert_accessor_symbol(semantic_table, true, base_name, 1, ST_VOID);
     if (result_code != SUCCESS) {
         return result_code;
     }
 
-   //fprintf(stdout, "[sem] scope PUSH (setter=%s)\n", sname);
+    //fprintf(stdout, "[sem] scope PUSH (setter=%s)\n", sname);
     sem_scope_enter_block(semantic_table);
 
     if (!scopes_declare_local(&semantic_table->scopes, param_name, true)) {
-        (void)sem_scope_leave_block(semantic_table, "sem_handle_setter_node (param)");
-       //fprintf(stdout, "[sem] scope POP (setter=%s, param redeclared)\n", sname);
+        (void) sem_scope_leave_block(semantic_table, "sem_handle_setter_node (param)");
+        //fprintf(stdout, "[sem] scope POP (setter=%s, param redeclared)\n", sname);
         return error(ERR_REDEF, "setter parameter redeclared: %s", param_name ? param_name : "(null)");
     }
 
@@ -1933,8 +1954,8 @@ static int sem_handle_setter_node(semantic *semantic_table, ast_node node) {
 
     result_code = symtab_insert_symbol(semantic_table, ST_PAR, param_name, 0, ST_VOID);
     if (result_code != SUCCESS) {
-        (void)sem_scope_leave_block(semantic_table, "sem_handle_setter_node (param symtab)");
-       //fprintf(stdout, "[sem] scope POP (setter=%s, early error)\n", sname);
+        (void) sem_scope_leave_block(semantic_table, "sem_handle_setter_node (param symtab)");
+        //fprintf(stdout, "[sem] scope POP (setter=%s, early error)\n", sname);
         return result_code;
     }
 
@@ -1942,15 +1963,15 @@ static int sem_handle_setter_node(semantic *semantic_table, ast_node node) {
         for (ast_node stmt = node->data.setter.body->first; stmt; stmt = stmt->next) {
             result_code = visit_statement_node(semantic_table, stmt);
             if (result_code != SUCCESS) {
-                (void)sem_scope_leave_block(semantic_table, "sem_handle_setter_node (body)");
-               //fprintf(stdout, "[sem] scope POP (setter=%s, early error)\n", sname);
+                (void) sem_scope_leave_block(semantic_table, "sem_handle_setter_node (body)");
+                //fprintf(stdout, "[sem] scope POP (setter=%s, early error)\n", sname);
                 return result_code;
             }
         }
     }
 
     result_code = sem_scope_leave_block(semantic_table, "sem_handle_setter_node");
-   //fprintf(stdout, "[sem] scope POP (setter=%s)\n", sname);
+    //fprintf(stdout, "[sem] scope POP (setter=%s)\n", sname);
     return result_code;
 }
 
@@ -1983,14 +2004,14 @@ static int visit_statement_node(semantic *semantic_table, ast_node node) {
             if (semantic_table->loop_depth <= 0) {
                 return error(ERR_SEM, "break outside of loop");
             }
-           //fprintf(stdout, "[sem] break (ok, depth=%d, scope=%s)\n", semantic_table->loop_depth, sem_scope_ids_current(&semantic_table->ids));
+            //fprintf(stdout, "[sem] break (ok, depth=%d, scope=%s)\n", semantic_table->loop_depth, sem_scope_ids_current(&semantic_table->ids));
             return SUCCESS;
 
         case AST_CONTINUE:
             if (semantic_table->loop_depth <= 0) {
                 return error(ERR_SEM, "continue outside of loop");
             }
-           //fprintf(stdout, "[sem] continue (ok, depth=%d, scope=%s)\n", semantic_table->loop_depth, sem_scope_ids_current(&semantic_table->ids));
+            //fprintf(stdout, "[sem] continue (ok, depth=%d, scope=%s)\n", semantic_table->loop_depth, sem_scope_ids_current(&semantic_table->ids));
             return SUCCESS;
 
         case AST_EXPRESSION:
@@ -1998,10 +2019,11 @@ static int visit_statement_node(semantic *semantic_table, ast_node node) {
 
         case AST_VAR_DECLARATION: {
             const char *variable_name = node->data.declaration.name;
-           //fprintf(stdout, "[sem] var declare: %s (scope=%s)\n", variable_name ? variable_name : "(null)", sem_scope_ids_current(&semantic_table->ids));
+            //fprintf(stdout, "[sem] var declare: %s (scope=%s)\n", variable_name ? variable_name : "(null)", sem_scope_ids_current(&semantic_table->ids));
 
             if (!scopes_declare_local(&semantic_table->scopes, variable_name, true)) {
-                return error(ERR_REDEF, "variable '%s' already declared in this scope", variable_name ? variable_name : "(null)");
+                return error(ERR_REDEF, "variable '%s' already declared in this scope",
+                             variable_name ? variable_name : "(null)");
             }
 
             st_data *variable_data = scopes_lookup_in_current(&semantic_table->scopes, variable_name);
@@ -2019,7 +2041,7 @@ static int visit_statement_node(semantic *semantic_table, ast_node node) {
 
         case AST_ASSIGNMENT: {
             const char *assigned_name = node->data.assignment.name;
-           //fprintf(stdout, "[sem] assign to: %s (scope=%s)\n", assigned_name ? assigned_name : "(null)", sem_scope_ids_current(&semantic_table->ids));
+            //fprintf(stdout, "[sem] assign to: %s (scope=%s)\n", assigned_name ? assigned_name : "(null)", sem_scope_ids_current(&semantic_table->ids));
 
             int result_code = sem_check_assignment_lhs(semantic_table, assigned_name);
             if (result_code != SUCCESS) {
@@ -2038,7 +2060,7 @@ static int visit_statement_node(semantic *semantic_table, ast_node node) {
                 return SUCCESS;
             }
 
-           //fprintf(stdout, "[sem] IFJ stmt call: %s (scope=%s)\n", ifj_call->name, sem_scope_ids_current(&semantic_table->ids));
+            //fprintf(stdout, "[sem] IFJ stmt call: %s (scope=%s)\n", ifj_call->name, sem_scope_ids_current(&semantic_table->ids));
             return sem_check_builtin_call(semantic_table, ifj_call->name, ifj_call->parameters);
         }
 
@@ -2122,17 +2144,18 @@ static int collect_headers_from_block(semantic *semantic_table, ast_block block_
                 ast_function function_node = node->data.function;
                 const char *function_name = function_node->name;
 
-               //fprintf(stdout, "[sem] header: %s params=", function_name ? function_name : "(null)");
+                //fprintf(stdout, "[sem] header: %s params=", function_name ? function_name : "(null)");
                 //const char *separator = "";
                 for (ast_parameter parameter = function_node->parameters; parameter; parameter = parameter->next) {
                     //const char *param_name = sem_get_parameter_name(parameter);
-                   //fprintf(stdout, "%s%s", separator, param_name ? param_name : "(null)");
+                    //fprintf(stdout, "%s%s", separator, param_name ? param_name : "(null)");
                     //separator = ", ";
                 }
-               //fprintf(stdout, "\n");
+                //fprintf(stdout, "\n");
 
                 int arity = count_parameters(function_node->parameters);
-                int result_code = function_table_insert_signature(semantic_table, function_name, arity, class_scope_name);
+                int result_code = function_table_insert_signature(semantic_table, function_name, arity,
+                                                                  class_scope_name);
                 if (result_code != SUCCESS) {
                     return result_code;
                 }
@@ -2144,7 +2167,8 @@ static int collect_headers_from_block(semantic *semantic_table, ast_block block_
                 break;
             }
             case AST_GETTER: {
-                int result_code = function_table_insert_accessor(semantic_table, node->data.getter.name, false, class_scope_name, NULL);
+                int result_code = function_table_insert_accessor(semantic_table, node->data.getter.name, false,
+                                                                 class_scope_name, NULL);
                 if (result_code != SUCCESS) {
                     return result_code;
                 }
@@ -2152,7 +2176,8 @@ static int collect_headers_from_block(semantic *semantic_table, ast_block block_
             }
             case AST_SETTER: {
                 const char *setter_param = node->data.setter.param;
-                int result_code = function_table_insert_accessor(semantic_table, node->data.setter.name, true, class_scope_name, setter_param);
+                int result_code = function_table_insert_accessor(semantic_table, node->data.setter.name, true,
+                                                                 class_scope_name, setter_param);
                 if (result_code != SUCCESS) {
                     return result_code;
                 }
@@ -2415,15 +2440,15 @@ int semantic_pass1(ast syntax_tree) {
     semantic_table.loop_depth = 0;
     semantic_table.seen_main = false;
 
-   //fprintf(stdout, "[sem] seeding IFJ built-ins...\n");
-    builtins_config builtins_configuration = (builtins_config){ .ext_boolthen = false, .ext_statican = false };
+    //fprintf(stdout, "[sem] seeding IFJ built-ins...\n");
+    builtins_config builtins_configuration = (builtins_config){.ext_boolthen = false, .ext_statican = false};
     if (!builtins_install(semantic_table.funcs, builtins_configuration)) {
         int rc = error(ERR_INTERNAL, "failed to install built-ins");
         st_free(semantic_table.funcs);
         st_free(semantic_table.symtab);
         return rc;
     }
-   //fprintf(stdout, "[sem] built-ins seeded.\n");
+    //fprintf(stdout, "[sem] built-ins seeded.\n");
 
     sem_copy_builtins_to_symbol_table(&semantic_table);
 
@@ -2555,11 +2580,11 @@ static int sem2_resolve_identifier(semantic *cxt, const char *name) {
         return SUCCESS;
     }
 
-   //printf("[sem2][ID] Resolving '%s' at scope=%s\n", name, sem_scope_ids_current(&cxt->ids));
+    //printf("[sem2][ID] Resolving '%s' at scope=%s\n", name, sem_scope_ids_current(&cxt->ids));
 
     st_data *local = scopes_lookup(&cxt->scopes, name);
     if (local) {
-       //printf("[sem2][ID] → local OK (symbol_type=%d)\n", local->symbol_type);
+        //printf("[sem2][ID] → local OK (symbol_type=%d)\n", local->symbol_type);
         return SUCCESS;
     }
 
@@ -2567,18 +2592,18 @@ static int sem2_resolve_identifier(semantic *cxt, const char *name) {
     make_accessor_key(key_get, sizeof key_get, name, false);
     make_accessor_key(key_set, sizeof key_set, name, true);
 
-   //printf("[sem2][ID] Trying accessor keys: get='%s', set='%s'\n", key_get, key_set);
+    //printf("[sem2][ID] Trying accessor keys: get='%s', set='%s'\n", key_get, key_set);
 
     bool has_getter = (st_find(cxt->funcs, key_get) != NULL);
     bool has_setter = (st_find(cxt->funcs, key_set) != NULL);
 
     if (has_getter) {
-       //printf("[sem2][ID] → getter OK\n");
+        //printf("[sem2][ID] → getter OK\n");
         return SUCCESS;
     }
 
     if (has_setter) {
-       //printf("[sem2][ID] → setter exists but no getter → ERROR\n");
+        //printf("[sem2][ID] → setter exists but no getter → ERROR\n");
         return error(ERR_DEF, "use of setter-only property '%s' without getter", name);
     }
 
@@ -2587,11 +2612,11 @@ static int sem2_resolve_identifier(semantic *cxt, const char *name) {
         if (rc != SUCCESS) {
             return rc;
         }
-       //printf("[sem2][ID] → magic global OK\n");
+        //printf("[sem2][ID] → magic global OK\n");
         return SUCCESS;
     }
 
-   //printf("[sem2][ID] → ERROR undefined identifier\n");
+    //printf("[sem2][ID] → ERROR undefined identifier\n");
     return error(ERR_DEF, "use of undefined identifier '%s'", name);
 }
 
@@ -2616,10 +2641,10 @@ static int sem2_resolve_identifier(semantic *cxt, const char *name) {
  * @return SUCCESS or an error code.
  */
 static int sem2_check_function_call(semantic *cxt, const char *name, int arity) {
-   //printf("[sem2][CALL] Checking %s(%d) at scope=%s\n", name ? name : "(null)", arity, sem_scope_ids_current(&cxt->ids));
+    //printf("[sem2][CALL] Checking %s(%d) at scope=%s\n", name ? name : "(null)", arity, sem_scope_ids_current(&cxt->ids));
 
     if (!name) {
-       //printf("[sem2][CALL] Name null → skipping\n");
+        //printf("[sem2][CALL] Name null → skipping\n");
         return SUCCESS;
     }
 
@@ -2627,32 +2652,32 @@ static int sem2_check_function_call(semantic *cxt, const char *name, int arity) 
         char key[256];
         make_function_key(key, sizeof key, name, arity);
 
-       //printf("[sem2][CALL] → builtin, key='%s'\n", key);
+        //printf("[sem2][CALL] → builtin, key='%s'\n", key);
 
-        if (!st_find(cxt->funcs, (char *)key)) {
-           //printf("[sem2][CALL] → ERROR builtin wrong arity\n");
+        if (!st_find(cxt->funcs, (char *) key)) {
+            //printf("[sem2][CALL] → ERROR builtin wrong arity\n");
             return error(ERR_ARGNUM, "wrong number of arguments for builtin %s(%d)", name, arity);
         }
 
-       //printf("[sem2][CALL] → builtin OK\n");
+        //printf("[sem2][CALL] → builtin OK\n");
         return SUCCESS;
     }
 
     char sig_key[256];
     make_function_key(sig_key, sizeof sig_key, name, arity);
-   //printf("[sem2][CALL] → user key='%s'\n", sig_key);
+    //printf("[sem2][CALL] → user key='%s'\n", sig_key);
 
     if (function_table_has_signature(cxt, name, arity)) {
-       //printf("[sem2][CALL] → user OK exact match\n");
+        //printf("[sem2][CALL] → user OK exact match\n");
         return SUCCESS;
     }
 
     if (function_table_has_any_overload(cxt, name)) {
-       //printf("[sem2][CALL] → overload exists but wrong arity → ERROR\n");
+        //printf("[sem2][CALL] → overload exists but wrong arity → ERROR\n");
         return error(ERR_ARGNUM, "wrong number of arguments for %s (arity=%d)", name, arity);
     }
 
-   //printf("[sem2][CALL] → no such function → ERROR\n");
+    //printf("[sem2][CALL] → no such function → ERROR\n");
     return error(ERR_DEF, "call to undefined function '%s'", name);
 }
 
@@ -2678,44 +2703,42 @@ static int sem2_visit_expr(semantic *cxt, ast_expression e, data_type *out_type)
         *out_type = ST_UNKNOWN;
     }
 
-   //printf("[sem2][EXPR] Visiting expr type=%d at scope=%s\n", e->type, sem_scope_ids_current(&cxt->ids));
+    //printf("[sem2][EXPR] Visiting expr type=%d at scope=%s\n", e->type, sem_scope_ids_current(&cxt->ids));
 
     switch (e->type) {
         case AST_IDENTIFIER: {
             const char *name = e->operands.identifier.value;
-           //printf("[sem2][EXPR] → IDENT '%s'\n", name ? name : "(null)");
+            //printf("[sem2][EXPR] → IDENT '%s'\n", name ? name : "(null)");
 
             int rc = sem2_resolve_identifier(cxt, name);
             if (rc != SUCCESS) {
                 return rc;
             }
 
-             st_data *sym = scopes_lookup(&cxt->scopes, name);
+            st_data *sym = scopes_lookup(&cxt->scopes, name);
 
-    
-    if (!sym) {
-        char scopedKey[128];
-        snprintf(scopedKey, sizeof scopedKey, "%s::%s",
-                 sem_scope_ids_current(&cxt->ids), name);
 
-        sym = scopes_lookup(&cxt->scopes, scopedKey);
-    }
-   
-    
-     
-    if (sym && sym->decl_node &&
-        sym->decl_node->type == AST_VAR_DECLARATION) {
+            if (!sym) {
+                char scopedKey[128];
+                snprintf(scopedKey, sizeof scopedKey, "%s::%s",
+                         sem_scope_ids_current(&cxt->ids), name);
 
-        e->operands.identifier.cg_name =
-            sym->decl_node->data.declaration.cg_name;
+                sym = scopes_lookup(&cxt->scopes, scopedKey);
+            }
 
-        //printf("[sem2][ID] bind IDENT '%s' -> cg_name='%s'\n",name,e->operands.identifier.cg_name ?e->operands.identifier.cg_name : "(none)");
-    }
-    else if (sym && sym->params) {   // param_ptr: add this to st_data
-    e->operands.identifier.cg_name = sym->decl_node->data.function->parameters->cg_name;
 
-    //printf("[sem2][ID] bind IDENT '%s' -> param cg_name='%s'\n",name,e->operands.identifier.cg_name);
-}
+            if (sym && sym->decl_node &&
+                sym->decl_node->type == AST_VAR_DECLARATION) {
+                e->operands.identifier.cg_name =
+                        sym->decl_node->data.declaration.cg_name;
+
+                //printf("[sem2][ID] bind IDENT '%s' -> cg_name='%s'\n",name,e->operands.identifier.cg_name ?e->operands.identifier.cg_name : "(none)");
+            } else if (sym && sym->params) {
+                // param_ptr: add this to st_data
+                e->operands.identifier.cg_name = sym->decl_node->data.function->parameters->cg_name;
+
+                //printf("[sem2][ID] bind IDENT '%s' -> param cg_name='%s'\n",name,e->operands.identifier.cg_name);
+            }
 
             if (out_type && name) {
                 data_type t = ST_UNKNOWN;
@@ -2741,7 +2764,7 @@ static int sem2_visit_expr(semantic *cxt, ast_expression e, data_type *out_type)
         }
 
         case AST_VALUE: {
-           //printf("[sem2][EXPR] → literal value OK\n");
+            //printf("[sem2][EXPR] → literal value OK\n");
 
             if (out_type) {
                 switch (e->operands.identity.value_type) {
@@ -2769,12 +2792,12 @@ static int sem2_visit_expr(semantic *cxt, ast_expression e, data_type *out_type)
         case AST_FUNCTION_CALL: {
             ast_fun_call call = e->operands.function_call;
             if (!call) {
-               //printf("[sem2][EXPR] → null function call\n");
+                //printf("[sem2][EXPR] → null function call\n");
                 return SUCCESS;
             }
 
             int ar = count_parameters(call->parameters);
-           //printf("[sem2][EXPR] → FUNCTION_CALL '%s' arity=%d\n", call->name ? call->name : "(null)", ar);
+            //printf("[sem2][EXPR] → FUNCTION_CALL '%s' arity=%d\n", call->name ? call->name : "(null)", ar);
 
             int rc = sem2_check_function_call(cxt, call->name, ar);
             if (rc != SUCCESS) {
@@ -2782,7 +2805,7 @@ static int sem2_visit_expr(semantic *cxt, ast_expression e, data_type *out_type)
             }
 
             for (ast_parameter p = call->parameters; p; p = p->next) {
-               //printf("[sem2][EXPR] → param value_type=%d\n", p->value_type);
+                //printf("[sem2][EXPR] → param value_type=%d\n", p->value_type);
                 if (p->value_type == AST_VALUE_IDENTIFIER) {
                     rc = sem2_resolve_identifier(cxt, p->value.string_value);
                     if (rc != SUCCESS) {
@@ -2797,7 +2820,7 @@ static int sem2_visit_expr(semantic *cxt, ast_expression e, data_type *out_type)
                 if (call->name && builtins_is_builtin_qname(call->name)) {
                     char key[256];
                     make_function_key(key, sizeof key, call->name, ar);
-                    st_data *fn = st_get(cxt->funcs, (char *)key);
+                    st_data *fn = st_get(cxt->funcs, (char *) key);
                     if (fn) {
                         ret = fn->data_type;
                     }
@@ -2812,7 +2835,7 @@ static int sem2_visit_expr(semantic *cxt, ast_expression e, data_type *out_type)
         case AST_IFJ_FUNCTION_EXPR: {
             ast_ifj_function call = e->operands.ifj_function;
             if (!call) {
-               //printf("[sem2][EXPR] → IFJ FUNCTION (null)\n");
+                //printf("[sem2][EXPR] → IFJ FUNCTION (null)\n");
                 return SUCCESS;
             }
 
@@ -2831,7 +2854,7 @@ static int sem2_visit_expr(semantic *cxt, ast_expression e, data_type *out_type)
                 }
             }
 
-           //printf("[sem2][EXPR] → IFJ FUNCTION '%s' arity=%d\n", name, ar);
+            //printf("[sem2][EXPR] → IFJ FUNCTION '%s' arity=%d\n", name, ar);
 
             int rc = sem2_check_function_call(cxt, name, ar);
             if (rc != SUCCESS) {
@@ -2839,7 +2862,7 @@ static int sem2_visit_expr(semantic *cxt, ast_expression e, data_type *out_type)
             }
 
             for (ast_parameter p = call->parameters; p; p = p->next) {
-               //printf("[sem2][EXPR] → IFJ param value_type=%d\n", p->value_type);
+                //printf("[sem2][EXPR] → IFJ param value_type=%d\n", p->value_type);
                 if (p->value_type == AST_VALUE_IDENTIFIER) {
                     rc = sem2_resolve_identifier(cxt, p->value.string_value);
                     if (rc != SUCCESS) {
@@ -2852,7 +2875,7 @@ static int sem2_visit_expr(semantic *cxt, ast_expression e, data_type *out_type)
                 data_type ret = ST_UNKNOWN;
                 char key[256];
                 make_function_key(key, sizeof key, name, ar);
-                st_data *fn = st_get(cxt->funcs, (char *)key);
+                st_data *fn = st_get(cxt->funcs, (char *) key);
                 if (fn) {
                     ret = fn->data_type;
                 }
@@ -2864,7 +2887,7 @@ static int sem2_visit_expr(semantic *cxt, ast_expression e, data_type *out_type)
 
         case AST_NOT:
         case AST_NOT_NULL: {
-           //printf("[sem2][EXPR] → unary\n");
+            //printf("[sem2][EXPR] → unary\n");
             data_type inner;
             int rc = sem2_visit_expr(cxt, e->operands.unary_op.expression, &inner);
             if (rc != SUCCESS) {
@@ -2890,7 +2913,7 @@ static int sem2_visit_expr(semantic *cxt, ast_expression e, data_type *out_type)
         case AST_AND:
         case AST_OR:
         case AST_CONCAT: {
-           //printf("[sem2][EXPR] → binary op=%d\n", e->type);
+            //printf("[sem2][EXPR] → binary op=%d\n", e->type);
 
             data_type lt, rt;
             int rc = sem2_visit_expr(cxt, e->operands.binary_op.left, &lt);
@@ -2908,7 +2931,8 @@ static int sem2_visit_expr(semantic *cxt, ast_expression e, data_type *out_type)
 
             if (lhs_unknownish || rhs_unknownish) {
                 if (out_type) {
-                    if (e->type == AST_EQUALS || e->type == AST_NOT_EQUAL || e->type == AST_LT || e->type == AST_LE || e->type == AST_GT || e->type == AST_GE || e->type == AST_AND || e->type == AST_OR) {
+                    if (e->type == AST_EQUALS || e->type == AST_NOT_EQUAL || e->type == AST_LT || e->type == AST_LE || e
+                        ->type == AST_GT || e->type == AST_GE || e->type == AST_AND || e->type == AST_OR) {
                         *out_type = ST_BOOL;
                     } else {
                         *out_type = ST_UNKNOWN;
@@ -3004,7 +3028,7 @@ static int sem2_visit_expr(semantic *cxt, ast_expression e, data_type *out_type)
         }
 
         case AST_TERNARY: {
-           //printf("[sem2][EXPR] → TERNARY\n");
+            //printf("[sem2][EXPR] → TERNARY\n");
             data_type lt, rt;
             int rc = sem2_visit_expr(cxt, e->operands.binary_op.left, &lt);
             if (rc != SUCCESS) {
@@ -3021,7 +3045,7 @@ static int sem2_visit_expr(semantic *cxt, ast_expression e, data_type *out_type)
         }
 
         case AST_IS: {
-           //printf("[sem2][EXPR] → IS\n");
+            //printf("[sem2][EXPR] → IS\n");
 
             data_type lhs_type;
             int rc = sem2_visit_expr(cxt, e->operands.binary_op.left, &lhs_type);
@@ -3041,10 +3065,11 @@ static int sem2_visit_expr(semantic *cxt, ast_expression e, data_type *out_type)
             }
 
             if (strcmp(type_name, "Num") != 0 && strcmp(type_name, "String") != 0 && strcmp(type_name, "Null") != 0) {
-                return error(ERR_EXPR, "invalid type '%s' on right-hand side of 'is' (expected Num, String or Null)", type_name);
+                return error(ERR_EXPR, "invalid type '%s' on right-hand side of 'is' (expected Num, String or Null)",
+                             type_name);
             }
 
-           //printf("[sem2][EXPR] → IS '%s' OK\n", type_name);
+            //printf("[sem2][EXPR] → IS '%s' OK\n", type_name);
 
             if (out_type) {
                 *out_type = ST_BOOL;
@@ -3054,14 +3079,14 @@ static int sem2_visit_expr(semantic *cxt, ast_expression e, data_type *out_type)
 
         case AST_NONE:
         case AST_NIL:
-           //printf("[sem2][EXPR] → NIL/NONE\n");
+            //printf("[sem2][EXPR] → NIL/NONE\n");
             if (out_type) {
                 *out_type = ST_NULL;
             }
             return SUCCESS;
 
         default:
-           //printf("[sem2][EXPR] → unhandled type\n");
+            //printf("[sem2][EXPR] → unhandled type\n");
             return SUCCESS;
     }
 }
@@ -3085,15 +3110,15 @@ static int sem2_visit_statement_node(semantic *table, ast_node node) {
         return SUCCESS;
     }
 
-   //printf("[sem2][STMT] Node type=%d at scope=%s\n", node->type, sem_scope_ids_current(&table->ids));
+    //printf("[sem2][STMT] Node type=%d at scope=%s\n", node->type, sem_scope_ids_current(&table->ids));
 
     switch (node->type) {
         case AST_BLOCK:
-           //printf("[sem2][STMT] → BLOCK\n");
+            //printf("[sem2][STMT] → BLOCK\n");
             return sem2_visit_block(table, node->data.block);
 
         case AST_CONDITION: {
-           //printf("[sem2][STMT] → IF condition\n");
+            //printf("[sem2][STMT] → IF condition\n");
             data_type cond_type = ST_UNKNOWN;
 
             if (node->data.condition.condition) {
@@ -3103,18 +3128,18 @@ static int sem2_visit_statement_node(semantic *table, ast_node node) {
                 }
             }
 
-           //printf("[sem2][STMT] → IF branch\n");
+            //printf("[sem2][STMT] → IF branch\n");
             int rc = sem2_visit_block(table, node->data.condition.if_branch);
             if (rc != SUCCESS) {
                 return rc;
             }
 
-           //printf("[sem2][STMT] → ELSE branch\n");
+            //printf("[sem2][STMT] → ELSE branch\n");
             return sem2_visit_block(table, node->data.condition.else_branch);
         }
 
         case AST_WHILE_LOOP: {
-           //printf("[sem2][STMT] → WHILE\n");
+            //printf("[sem2][STMT] → WHILE\n");
             data_type cond_type = ST_UNKNOWN;
 
             if (node->data.while_loop.condition) {
@@ -3128,7 +3153,7 @@ static int sem2_visit_statement_node(semantic *table, ast_node node) {
         }
 
         case AST_EXPRESSION: {
-           //printf("[sem2][STMT] → EXPRESSION\n");
+            //printf("[sem2][STMT] → EXPRESSION\n");
             data_type dummy = ST_UNKNOWN;
             if (!node->data.expression) {
                 return SUCCESS;
@@ -3151,7 +3176,7 @@ static int sem2_visit_statement_node(semantic *table, ast_node node) {
                 return error(ERR_INTERNAL, "scope lookup failed for '%s'", name);
             }
             // creating cg_name
-            
+
             char scope_raw[64];
             const char *scope_src = sem_scope_ids_current(&table->ids);
             size_t scope_len = strlen(scope_src);
@@ -3165,7 +3190,7 @@ static int sem2_visit_statement_node(semantic *table, ast_node node) {
             int j = 0;
             for (int i = 0; scope_raw[i] != '\0'; i++) {
                 if (scope_raw[i] != '.') {
-                    if (j + 1 >= (int)sizeof scope_clean -1) {
+                    if (j + 1 >= (int) sizeof scope_clean - 1) {
                         break;
                     }
                     scope_clean[j++] = scope_raw[i];
@@ -3201,15 +3226,15 @@ static int sem2_visit_statement_node(semantic *table, ast_node node) {
             final[pos] = '\0';
 
             if (node->data.declaration.cg_name) {
-            free(node->data.declaration.cg_name);
-             }
+                free(node->data.declaration.cg_name);
+            }
             node->data.declaration.cg_name = my_strdup(final);
             if (!node->data.declaration.cg_name) {
-            return error(ERR_INTERNAL, "memory allocation failed for cg_name");
-        }
+                return error(ERR_INTERNAL, "memory allocation failed for cg_name");
+            }
             sym->decl_node = node;
 
-           //printf("[sem2] new local '%s' -> cg_name='%s'\n", name, node->data.declaration.cg_name ? node->data.declaration.cg_name : "(null)");
+            //printf("[sem2] new local '%s' -> cg_name='%s'\n", name, node->data.declaration.cg_name ? node->data.declaration.cg_name : "(null)");
 
             return SUCCESS;
         }
@@ -3217,7 +3242,7 @@ static int sem2_visit_statement_node(semantic *table, ast_node node) {
         case AST_ASSIGNMENT: {
             const char *lhs = node->data.assignment.name;
 
-           //printf("[sem2] ASSIGN → %s (scope=%s)\n", lhs ? lhs : "(null)", sem_scope_ids_current(&table->ids));
+            //printf("[sem2] ASSIGN → %s (scope=%s)\n", lhs ? lhs : "(null)", sem_scope_ids_current(&table->ids));
 
             if (!lhs) {
                 return error(ERR_INTERNAL, "assignment without LHS name");
@@ -3242,16 +3267,14 @@ static int sem2_visit_statement_node(semantic *table, ast_node node) {
                 sem_magic_global_type_learn(lhs, rhs_type);
             } else {
                 st_data *sym = scopes_lookup(&table->scopes, lhs);
-                //cg_name  
-                if (sym && sym->decl_node && sym->decl_node->type == AST_VAR_DECLARATION){
-                    
+                //cg_name
+                if (sym && sym->decl_node && sym->decl_node->type == AST_VAR_DECLARATION) {
                     const char *decl_cg = sym->decl_node->data.declaration.cg_name;
                     if (decl_cg) {
-                        
                         if (node->data.assignment.cg_name) {
                             free(node->data.assignment.cg_name);
                         }
-                        
+
                         node->data.assignment.cg_name = my_strdup(decl_cg);
                         if (!node->data.assignment.cg_name) {
                             return error(ERR_INTERNAL, "memory allocation failed for assignment cg_name");
@@ -3274,7 +3297,7 @@ static int sem2_visit_statement_node(semantic *table, ast_node node) {
                         }
 
                         sym->data_type = new_t;
-                       //printf("[sem2][ASSIGN] '%s' type old=%d new=%d\n", lhs, old_t, sym->data_type);
+                        //printf("[sem2][ASSIGN] '%s' type old=%d new=%d\n", lhs, old_t, sym->data_type);
                     }
                 }
             }
@@ -3283,7 +3306,7 @@ static int sem2_visit_statement_node(semantic *table, ast_node node) {
         }
 
         case AST_FUNCTION: {
-           //printf("[sem2][STMT] → FUNCTION\n");
+            //printf("[sem2][STMT] → FUNCTION\n");
 
             ast_function fn = node->data.function;
             if (!fn) {
@@ -3291,7 +3314,7 @@ static int sem2_visit_statement_node(semantic *table, ast_node node) {
             }
 
             sem_scope_enter_block(table);
-           //printf("[sem2][FUNC] scope=%s\n", sem_scope_ids_current(&table->ids));
+            //printf("[sem2][FUNC] scope=%s\n", sem_scope_ids_current(&table->ids));
 
             int rc = declare_parameter_list_in_current_scope(table, fn->parameters);
             if (rc != SUCCESS) {
@@ -3309,7 +3332,6 @@ static int sem2_visit_statement_node(semantic *table, ast_node node) {
             clean[j] = '\0';
 
             for (ast_parameter p = fn->parameters; p; p = p->next) {
-
                 if (p->value_type != AST_VALUE_IDENTIFIER)
                     continue;
 
@@ -3321,14 +3343,14 @@ static int sem2_visit_statement_node(semantic *table, ast_node node) {
                 if (!sym || !sym->decl_node)
                     continue;
 
-               
+
                 char final[128];
                 snprintf(final, sizeof(final), "%s_%s", pname, clean);
 
-            
+
                 p->cg_name = my_strdup(final);
 
-              
+
                 sym->decl_node->data.declaration.cg_name = p->cg_name;
 
                 //printf("[sem2] param '%s' -> cg_name='%s'\n", pname, p->cg_name);
@@ -3349,12 +3371,12 @@ static int sem2_visit_statement_node(semantic *table, ast_node node) {
         }
 
         case AST_GETTER: {
-           //printf("[sem2][STMT] → GETTER\n");
+            //printf("[sem2][STMT] → GETTER\n");
 
             ast_block body = node->data.getter.body;
 
             sem_scope_enter_block(table);
-           //printf("[sem2][GETTER] scope=%s\n", sem_scope_ids_current(&table->ids));
+            //printf("[sem2][GETTER] scope=%s\n", sem_scope_ids_current(&table->ids));
 
             int rc = SUCCESS;
             if (body) {
@@ -3372,16 +3394,16 @@ static int sem2_visit_statement_node(semantic *table, ast_node node) {
         }
 
         case AST_SETTER: {
-           //printf("[sem2][STMT] → SETTER\n");
+            //printf("[sem2][STMT] → SETTER\n");
 
             const char *param_name = node->data.setter.param;
             ast_block body = node->data.setter.body;
 
             sem_scope_enter_block(table);
-           //printf("[sem2][SETTER] scope=%s\n", sem_scope_ids_current(&table->ids));
+            //printf("[sem2][SETTER] scope=%s\n", sem_scope_ids_current(&table->ids));
 
             if (param_name) {
-               //printf("[sem2][SETTER] declare param '%s'\n", param_name);
+                //printf("[sem2][SETTER] declare param '%s'\n", param_name);
 
                 if (!scopes_declare_local(&table->scopes, param_name, true)) {
                     sem_scope_leave_block(table, "setter header");
@@ -3410,7 +3432,7 @@ static int sem2_visit_statement_node(semantic *table, ast_node node) {
         }
 
         case AST_CALL_FUNCTION: {
-           //printf("[sem2][STMT] → CALL_FUNCTION\n");
+            //printf("[sem2][STMT] → CALL_FUNCTION\n");
 
             ast_fun_call call = node->data.function_call;
             if (!call) {
@@ -3435,7 +3457,7 @@ static int sem2_visit_statement_node(semantic *table, ast_node node) {
         }
 
         case AST_RETURN: {
-           //printf("[sem2][STMT] → RETURN\n");
+            //printf("[sem2][STMT] → RETURN\n");
             data_type ret_type = ST_VOID;
 
             if (node->data.return_expr.output) {
@@ -3447,11 +3469,11 @@ static int sem2_visit_statement_node(semantic *table, ast_node node) {
 
         case AST_BREAK:
         case AST_CONTINUE:
-           //printf("[sem2][STMT] → BREAK/CONTINUE (ignored in Pass 2)\n");
+            //printf("[sem2][STMT] → BREAK/CONTINUE (ignored in Pass 2)\n");
             return SUCCESS;
 
         case AST_IFJ_FUNCTION: {
-           //printf("[sem2][STMT] → IFJ_FUNCTION\n");
+            //printf("[sem2][STMT] → IFJ_FUNCTION\n");
             ast_ifj_function call = node->data.ifj_function;
             if (!call) {
                 return SUCCESS;
@@ -3478,37 +3500,36 @@ static int sem2_visit_statement_node(semantic *table, ast_node node) {
             }
             //cg_name
             for (ast_parameter p = call->parameters; p; p = p->next) {
+                // Only IDENTIFIER parameters have a name!
+                if (p->value_type != AST_VALUE_IDENTIFIER)
+                    continue;
 
-    // Only IDENTIFIER parameters have a name!
-    if (p->value_type != AST_VALUE_IDENTIFIER)
-        continue;
+                const char *pname = p->value.string_value;
+                if (!pname)
+                    continue;
 
-    const char *pname = p->value.string_value;
-    if (!pname) 
-        continue;
 
-    
-    st_data *sym = scopes_lookup(&table->scopes, pname);
-    if (!sym) 
-        continue;
+                st_data *sym = scopes_lookup(&table->scopes, pname);
+                if (!sym)
+                    continue;
 
-    
-    const char *scope_str = sem_scope_ids_current(&table->ids);
 
-    char clean[64];
-    int j = 0;
-    for (int i = 0; scope_str[i] != '\0'; i++) {
-        if (scope_str[i] != '.' && j < 63)
-            clean[j++] = scope_str[i];
-    }
-    clean[j] = '\0';
+                const char *scope_str = sem_scope_ids_current(&table->ids);
 
-    char final[128];
-    snprintf(final, sizeof(final), "%s_%s", pname, clean);
+                char clean[64];
+                int j = 0;
+                for (int i = 0; scope_str[i] != '\0'; i++) {
+                    if (scope_str[i] != '.' && j < 63)
+                        clean[j++] = scope_str[i];
+                }
+                clean[j] = '\0';
 
-    p->cg_name = my_strdup(final);
-}
-    
+                char final[128];
+                snprintf(final, sizeof(final), "%s_%s", pname, clean);
+
+                p->cg_name = my_strdup(final);
+            }
+
             for (ast_parameter p = call->parameters; p; p = p->next) {
                 if (p->value_type == AST_VALUE_IDENTIFIER) {
                     rc = sem2_resolve_identifier(table, p->value.string_value);
@@ -3520,8 +3541,8 @@ static int sem2_visit_statement_node(semantic *table, ast_node node) {
             return SUCCESS;
         }
     }
-    
-   //printf("[sem2][STMT] → unhandled\n");
+
+    //printf("[sem2][STMT] → unhandled\n");
     return SUCCESS;
 }
 
@@ -3541,23 +3562,23 @@ static int sem2_visit_block(semantic *table, ast_block blk) {
         return SUCCESS;
     }
 
-   //printf("[sem2][BLK] ENTER block (current scope=%s)\n", sem_scope_ids_current(&table->ids));
+    //printf("[sem2][BLK] ENTER block (current scope=%s)\n", sem_scope_ids_current(&table->ids));
 
     sem_scope_enter_block(table);
 
-   //printf("[sem2][BLK] NEW scope=%s\n", sem_scope_ids_current(&table->ids));
+    //printf("[sem2][BLK] NEW scope=%s\n", sem_scope_ids_current(&table->ids));
 
     for (ast_node n = blk->first; n; n = n->next) {
-       //printf("[sem2][BLK] Visiting node...\n");
+        //printf("[sem2][BLK] Visiting node...\n");
         int rc = sem2_visit_statement_node(table, n);
         if (rc != SUCCESS) {
-           //printf("[sem2][BLK] ERROR inside block\n");
+            //printf("[sem2][BLK] ERROR inside block\n");
             sem_scope_leave_block(table, "sem2_visit_block");
             return rc;
         }
     }
 
-   //printf("[sem2][BLK] LEAVE scope=%s\n", sem_scope_ids_current(&table->ids));
+    //printf("[sem2][BLK] LEAVE scope=%s\n", sem_scope_ids_current(&table->ids));
 
     sem_scope_leave_block(table, "sem2_visit_block");
     return SUCCESS;
@@ -3578,9 +3599,9 @@ static int sem2_visit_block(semantic *table, ast_block blk) {
  * @return SUCCESS or the first error encountered.
  */
 int semantic_pass2(semantic *table, ast syntax_tree) {
-   //printf("[sem2] =========================================\n");
-   //printf("[sem2] Starting Pass 2\n");
-   //printf("[sem2] =========================================\n");
+    //printf("[sem2] =========================================\n");
+    //printf("[sem2] Starting Pass 2\n");
+    //printf("[sem2] =========================================\n");
 
     scopes_init(&table->scopes);
     sem_scope_ids_init(&table->ids);
@@ -3588,21 +3609,21 @@ int semantic_pass2(semantic *table, ast syntax_tree) {
 
     for (ast_class c = syntax_tree->class_list; c; c = c->next) {
         ast_block root = get_class_root_block(c);
-       //printf("[sem2] CLASS → '%s'\n", c->name ? c->name : "(anonymous)");
+        //printf("[sem2] CLASS → '%s'\n", c->name ? c->name : "(anonymous)");
 
         if (!root) {
-           //printf("[sem2]   (no root block)\n");
+            //printf("[sem2]   (no root block)\n");
             continue;
         }
 
         int rc = sem2_visit_block(table, root);
         if (rc != SUCCESS) {
-           //printf("[sem2] Pass 2 FAILED\n");
+            //printf("[sem2] Pass 2 FAILED\n");
             return rc;
         }
     }
 
-   //printf("[sem2] Pass 2 completed successfully.\n");
+    //printf("[sem2] Pass 2 completed successfully.\n");
     return SUCCESS;
 }
 

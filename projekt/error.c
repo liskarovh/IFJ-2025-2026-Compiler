@@ -3,7 +3,7 @@
 
  * @file error.c
  * 
- * Error handeling and output to stderr
+ * Error handling and output to stderr
  * BUT FIT
  */
 
@@ -17,15 +17,15 @@
 /// @param fmt 
 /// @param  ...
 /// @return exitcode
-int error(int exit_code, const char *fmt, ...){
+int error(int exit_code, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
 
-    #ifndef NERROR
+#ifndef NERROR
     fprintf(stderr, "Error:");
     vfprintf(stderr, fmt, args);
     fprintf(stderr, "\n");
-    #endif
+#endif
 
     va_end(args);
     return exit_code;

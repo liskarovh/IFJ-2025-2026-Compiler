@@ -71,7 +71,6 @@ print-sem-dir:
 	@echo "SEM_TESTS_DIR = $(SEM_TESTS_DIR)"
 	@ls -l $(SEM_TESTS_DIR) || true
 
-# pre-flight kontrola
 check-sem-files:
 	@missing=0; \
 	for f in $(SEM_TESTS_DIR)/test_stack.c \
@@ -82,7 +81,7 @@ check-sem-files:
 	done; \
 	if [ $$missing -ne 0 ]; then exit 2; fi
 
-# --- build: jednotlivé test binárky --------------------------------
+# --- build--------------------------------
 test_stack: stack.c $(SEM_TESTS_DIR)/test_stack.c | check-sem-files
 	$(CC) $(CFLAGS) $^ -o $@
 
@@ -95,7 +94,7 @@ test_scopes: stack.c symtable.c scope_stack.c $(SEM_TESTS_DIR)/test_scope_stack.
 test_integration: stack.c symtable.c scope_stack.c $(SEM_TESTS_DIR)/test_integration_fill_dump.c | check-sem-files
 	$(CC) $(CFLAGS) $^ -o $@
 
-# --- run: pohodlné spouštěcí aliasy --------------------------------
+# --- run--------------------------------
 test-stack: test_stack
 	@echo '>>> Running stack unit tests'
 	@./test_stack
@@ -112,7 +111,6 @@ test-integration: test_integration
 	@echo '>>> Running integration test (stack + scope_stack + symtable)'
 	@./test_integration
 
-# Spustí všechny výše
 tests: test-stack test-symtable test-scopes test-integration
 
 # =================================================================
@@ -120,6 +118,5 @@ tests: test-stack test-symtable test-scopes test-integration
 # =================================================================
 build-sem-tests: test_symtable test_scopes test_integration
 
-# aliasy: 'make sem' nebo 'make test-sem' spustí všechny sémantické testy
 test-sem sem sem-tests semantic-tests: test-symtable test-scopes test-integration
 	@echo '>>> All semantic tests finished.'

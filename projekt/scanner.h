@@ -57,5 +57,4 @@ int scanner_append_next_token(DLListTokens *list);
 int scanner(FILE *source, DLListTokens *out_list);
 
 
-
 #endif // IFJ_SCANNER_H

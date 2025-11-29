@@ -1,20 +1,16 @@
 /**
  * @file stack.c
- * @authors 
- *   Matej Kurta (xkurtam00)
+ * @authors Matej Kurta (xkurtam00)
  *
  * @brief Implementation of a stack structure and its operations.
  *
- *
- * @date 2025-10-30
- * @version 1.0
  * @note Project: IFJ / BUT FIT
  */
 
 #include "stack.h"
 #include <stdlib.h>
 #include <stdbool.h>
-#include <string.h>   
+#include <string.h>
 
 /**
  * @brief Initializes a stack structure.

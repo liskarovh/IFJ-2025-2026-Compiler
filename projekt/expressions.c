@@ -311,7 +311,6 @@ int parse_expr(DLListTokens *tokenlist, ast_expression *out_ast){
                 }
             }
             if (input == ID && tokenlist->active->next != NULL && tokenlist->active->next->token->type == T_LPAREN) {
-                printf("FUN CALL");
                 expr_item item;
                 item.symbol = input;
                 item.token = NULL;

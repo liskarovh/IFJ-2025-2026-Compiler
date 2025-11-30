@@ -123,7 +123,7 @@ static const builtin_row g_rows[] = {
         "Ifj.read_bool", 0,
         {BUILTIN_PARAM_ANY, BUILTIN_PARAM_ANY, BUILTIN_PARAM_ANY},
         ST_BOOL, // Bool
-        true, false
+        false, false
     }, /* BOOLTHEN */
 
     {
@@ -157,7 +157,7 @@ bool builtins_install(symtable *gtab, builtins_config cfg) {
             continue;
         }
 
-        // Insert signature "<qname>#<arity>" as ST_FUN with param_count set.
+        // Insert signature "<qname>#<arity>" as ST_FUN with param_count set
         st_insert(gtab, key, ST_FUN, true);
         st_data *d = st_get(gtab, key);
         if (!d) {

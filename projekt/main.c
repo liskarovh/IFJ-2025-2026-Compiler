@@ -4,7 +4,7 @@
  *
  * @file main.c
  *
- * Error handling and output to stderr
+ * @brief Compiler main pipeline
  * BUT FIT
  */
 

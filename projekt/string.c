@@ -3,7 +3,7 @@
 
  * @file string.c
  * 
- * Custom dynamic strings for easy string manipulation
+ * @brief Custom dynamic strings for easy string manipulation
  * BUT FIT
  */
 

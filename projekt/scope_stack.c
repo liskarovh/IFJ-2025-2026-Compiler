@@ -8,7 +8,7 @@
  * Each scope frame stores a @c symtable* of local identifiers. Enables:
  *  - push/pop of frames on block/function entry/exit,
  *  - declaring locals with no redeclare in the same block,
- *  - lookups with correct shadowing (inner frames take precedence),
+ *  - lookups with correct shadowing
  *
  * BUT FIT
  */

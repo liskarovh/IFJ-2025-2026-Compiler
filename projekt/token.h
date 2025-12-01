@@ -1,9 +1,8 @@
 /**
  * @authors Martin Bíško (xbiskom00)
-
+ * @brief Definition of the token structure and list of tokens.
  * @file token.h
- * 
- * Implementation of the token structure and list of tokens
+ *
  * BUT FIT
  */
 

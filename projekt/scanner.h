@@ -3,7 +3,7 @@
  *
  * @file scanner.h
  *
- * Lexical analyzer implemented as a streaming FSM.
+ * @brief Lexical analyzer implemented as a streaming FSM.
  * Line/column are 1-based and refer to the position of the last read character.
  * BUT FIT
  */

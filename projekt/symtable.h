@@ -1,11 +1,11 @@
 /**
  * @file symtable.h
- * @brief Symbol table implementation.
+ * @brief Symbol table definition.
  *
  * This header file defines the structures and functions for managing a symbol table,
  * which is used to store information about identifiers.
  *
- * @author Matej Kurta (xkurtam00)
+ * @authors Matej Kurta (xkurtam00)
  * @note Project: IFJ / BUT FIT
  */
 

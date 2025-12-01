@@ -3,7 +3,7 @@
  *
  * @file stack.h
  *
- * Stack structure and its functions
+ * @brief Stack structure and its functions definition.
  * BUT FIT
  */
 

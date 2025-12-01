@@ -1,7 +1,7 @@
 /*
  * symtable.c
  *
- * Implementation of a symbol table using open addressing with linear probing.
+ * @brief Implementation of a symbol table using open addressing with linear probing.
  * @authors Matej Kurta (xkurtam00)
  * @note Project: IFJ / BUT FIT
  */

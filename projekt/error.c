@@ -3,7 +3,7 @@
 
  * @file error.c
  * 
- * Error handling and output to stderr
+ * @brief Error handling and output to stderr
  * BUT FIT
  */
 

@@ -106,7 +106,7 @@ static void sem_def_globals(generator gen) {
     char **globals = NULL;
     size_t count   = 0;
 
-    int rc = semantic_get_magic_globals(&globals, &count);
+    int rc = semantic_get_globals(&globals, &count);
     if (rc != SUCCESS) {
         return;
     }

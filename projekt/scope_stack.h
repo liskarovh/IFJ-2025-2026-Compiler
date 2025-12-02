@@ -33,20 +33,6 @@ typedef struct {
 void scopes_init(scope_stack *s);
 
 /**
- * @brief Check whether the scope stack is empty.
- * @param s Pointer to a @c scope_stack.
- * @return @c true if no frames are present, @c false otherwise.
- */
-bool scopes_is_empty(const scope_stack *s);
-
-/**
- * @brief Get current depth (number of frames).
- * @param s Pointer to a @c scope_stack.
- * @return Number of frames in the stack.
- */
-size_t scopes_depth(const scope_stack *s);
-
-/**
  * @brief Push a new empty frame (symtable) for a block/function body.
  * @param s Pointer to a @c scope_stack.
  */

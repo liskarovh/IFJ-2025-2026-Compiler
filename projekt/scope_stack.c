@@ -5,8 +5,8 @@
  * @file scope_stack.c
  * @brief Implementation of a scope stack for semantic analysis (IFJ25).
  *
- * Each scope frame stores a @c symtable* of local identifiers. Enables:
- *  - push/pop of frames on block/function entry/exit,
+ * Each scope stores symtable* of local identifiers. Enables:
+ *  - push/pop frames on block/function entry/exit,
  *  - declaring locals with no redeclare in the same block,
  *  - lookups with correct shadowing
  *
@@ -23,28 +23,6 @@
 void scopes_init(scope_stack *s) {
     assert(s);
     stack_init(&s->frames);
-}
-
-/**
- * @brief Check whether the scope stack is empty.
- * @param s Pointer to a @c scope_stack.
- * @return @c true if no frames are present, @c false otherwise.
- */
-bool scopes_is_empty(const scope_stack *s) {
-    assert(s);
-    return stack_is_empty((stack *) &s->frames);
-}
-
-/**
- * @brief Get current depth (number of frames).
- * @param s Pointer to a @c scope_stack.
- * @return Number of frames in the stack.
- */
-size_t scopes_depth(const scope_stack *s) {
-    assert(s);
-    size_t n = 0;
-    for (stack_item *it = s->frames.top; it; it = it->next) ++n;
-    return n;
 }
 
 /**
@@ -66,7 +44,7 @@ void scopes_push(scope_stack *s) {
  */
 bool scopes_pop(scope_stack *s) {
     assert(s);
-    symtable *t = (symtable *) stack_pop(&s->frames);
+    symtable *t = stack_pop(&s->frames);
     if (!t)
         return false;
     st_free(t);
@@ -80,7 +58,7 @@ bool scopes_pop(scope_stack *s) {
  */
 symtable *scopes_top(scope_stack *s) {
     assert(s);
-    return (symtable *) stack_top(&s->frames);
+    return stack_top(&s->frames);
 }
 
 /**
@@ -107,6 +85,12 @@ bool scopes_declare_local(scope_stack *s, const char *name, bool defined) {
     return st_get(top, (char *) name) != NULL;
 }
 
+/**
+ * @brief Lookup an identifier in the current frame only.
+ * @param s Pointer to a @c scope_stack.
+ * @param name Identifier name (string).
+ * @return Pointer to symbol data, or @c NULL if not found.
+ */
 st_data *scopes_lookup_in_current(scope_stack *s, const char *name) {
     assert(s && name);
     symtable *top = scopes_top(s);
@@ -115,10 +99,16 @@ st_data *scopes_lookup_in_current(scope_stack *s, const char *name) {
     return st_get(top, (char *) name);
 }
 
+/**
+ * @brief Lookup an identifier in all frames (with shadowing).
+ * @param s Pointer to a @c scope_stack.
+ * @param name Identifier name (string).
+ * @return Pointer to symbol data, or @c NULL if not found.
+ */
 st_data *scopes_lookup(scope_stack *s, const char *name) {
     assert(s && name);
     for (stack_item *it = s->frames.top; it; it = it->next) {
-        symtable *t = (symtable *) it->data;
+        symtable *t = it->data;
         if (!t)
             continue;
         st_data *d = st_get(t, (char *) name);
@@ -128,13 +118,21 @@ st_data *scopes_lookup(scope_stack *s, const char *name) {
     return NULL;
 }
 
+/**
+ * @brief Dispose the entire scope stack, freeing all frames and their symtables.
+ * @param s Pointer to a @c scope_stack.
+ */
 void scopes_dispose(scope_stack *s) {
     assert(s);
     while (scopes_pop(s)) {
     }
 }
 
-
+/**
+ * @brief Dump the entire scope stack to the given output stream.
+ * @param scopes Pointer to a @c scope_stack.
+ * @param out Output stream (e.g., @c stdout).
+ */
 void scopes_dump(const scope_stack *scopes, FILE *out) {
     if (!scopes || !out)
         return;
@@ -143,7 +141,7 @@ void scopes_dump(const scope_stack *scopes, FILE *out) {
 
     int idx = 0;
     for (const stack_item *it = scopes->frames.top; it; it = it->next, ++idx) {
-        symtable *frame = (symtable *) it->data;
+        symtable *frame = it->data;
         fprintf(out, "-- frame #%d --\n", idx);
         if (frame) {
             st_dump(frame, out);

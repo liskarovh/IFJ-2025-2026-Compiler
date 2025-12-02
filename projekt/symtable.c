@@ -76,7 +76,11 @@ st_symbol *st_find(symtable *table, char *key) {
 
     do {
         st_symbol *place = &table->table[index];
-        if (place->occupied && strcmp(place->key, key) == 0) return place;
+        if (!place->occupied && !place->deleted)
+            return NULL;
+
+        if (place->occupied && strcmp(place->key, key) == 0)
+            return place;
 
         index = (index + 1) % SYMTABLE_SIZE;
     } while (index != start);

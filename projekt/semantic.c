@@ -662,7 +662,7 @@ static int collect_headers_from_block(semantic *semantic_table, ast_block block_
  */
 static int function_table_insert_signature(semantic *semantic_table, const char *function_name, int arity, const char *class_scope_name) {
     char function_key[256];
-    make_function_key(function_key, sizeof function_key, function_name, arity);   // build key "name#arity"
+    make_function_key(function_key, sizeof function_key, function_name, arity); // build key "name#arity"
 
     // search existing signature
     st_data *existing = st_get(semantic_table->funcs, function_key);
@@ -762,7 +762,7 @@ static int function_table_insert_accessor(semantic *semantic_table, const char *
         }
         if (existing_scope && class_scope_name &&
             strcmp(existing_scope, class_scope_name) == 0) {
-            return error(ERR_REDEF, is_setter ? "duplicate setter for '%s' in class '%s'" : "duplicate getter for '%s' in class '%s'", base_name ? base_name : "(null)", existing_scope);                                                // reject second accessor in same class
+            return error(ERR_REDEF, is_setter ? "duplicate setter for '%s' in class '%s'" : "duplicate getter for '%s' in class '%s'", base_name ? base_name : "(null)", existing_scope); // reject second accessor in same class
         }
         // allow same base in a different class
         return SUCCESS;
@@ -1113,7 +1113,7 @@ static param_kind sem_get_param_literal_kind(ast_parameter param) {
     if ((param->value_type == AST_VALUE_STRING || param->value_type == AST_VALUE_IDENTIFIER) &&
         is_global_identifier(param->value.string_value)) {
         return PARAM_KIND_UNKNOWN;
-        }
+    }
     // map concrete ast value types to param_kind
     switch (param->value_type) {
         case AST_VALUE_STRING:
@@ -2180,7 +2180,7 @@ static int sem2_visit_expr(semantic *cxt, ast_expression e, data_type *out_type)
                         return SUCCESS;
                     }
                     return error(ERR_EXPR, "invalid operands for concat operator");
-                    // relational operators
+                // relational operators
                 case AST_LT:
                 case AST_LE:
                 case AST_GT:
@@ -2255,7 +2255,7 @@ static int sem2_visit_expr(semantic *cxt, ast_expression e, data_type *out_type)
             }
             // check allowed type names
             if (strcmp(type_name, "Num") != 0 && strcmp(type_name, "String") != 0 && strcmp(type_name, "Null") != 0) {
-                return error(ERR_EXPR, "invalid type '%s' on right-hand side of 'is' (expected Num, String or Null)",type_name);
+                return error(ERR_EXPR, "invalid type '%s' on right-hand side of 'is' (expected Num, String or Null)", type_name);
             }
 
             if (out_type) {
@@ -2348,8 +2348,9 @@ static int sem2_visit_statement_node(semantic *table, ast_node node) {
             if (!sym) {
                 return error(ERR_INTERNAL, "scope lookup failed for '%s'", name);
             }
+            sym->decl_node = node;
 
-            // build codegen name based on scope id
+            // build codegen name based on scope idm
             const char *scope_src = sem_scope_ids_current(&table->ids);
             char final[128];
             sem_build_cg_name(final, sizeof final, name, scope_src);

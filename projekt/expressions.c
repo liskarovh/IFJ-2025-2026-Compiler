@@ -1,8 +1,19 @@
+/**
+* @authors
+*   -   Martin Bíško (xbiskom00)
+*   -   Maťej Kurta (xkurtam00)
+ *
+ * @file expressions.h
+ * @brief Precedence parser for expressions.
+ * BUT FIT
+ */
 
 #include "expressions.h"
 #include <string.h>
 
-
+/*
+ * @brief Precedence table
+ */
 int prec_table[TABLE_SIZE][TABLE_SIZE] = 
 {
 //    */ | +- |  r | is | EQ | (  |  i |  ) |  $  |
@@ -17,6 +28,11 @@ int prec_table[TABLE_SIZE][TABLE_SIZE] =
     { '<', '<', '<', '<', '<', '<', '<', ' ', ' ' }
 };
 
+/*
+ * @brief Get precedence table index from symbol
+ * @param symbol prec_table_enum symbol
+ * @return prec_table_index index
+ */
 prec_table_index get_prec_index(prec_table_enum symbol){
 
     switch (symbol){
@@ -52,7 +68,11 @@ prec_table_index get_prec_index(prec_table_enum symbol){
     }
 }
 
-
+/*
+ * @brief Convert token to prec_table_enum symbol
+ * @param token token pointer
+ * @return prec_table_enum symbol
+ */
 prec_table_enum token_to_expr(tokenPtr token) {
     switch (token->type) {
         case T_PLUS: return PLUS;
@@ -86,6 +106,11 @@ prec_table_enum token_to_expr(tokenPtr token) {
     }
 }
 
+/*
+ * @brief Reduce rule in precedence parser
+ * @param stack stack pointer
+ * @return true if reduction was successful, false otherwise
+ */
 bool reduce_rule(stack *stack) {
     if(!stack->top) {
         return false;
@@ -129,31 +154,6 @@ bool reduce_rule(stack *stack) {
         top = *(expr_item *)stack->top->data;
         if(top.symbol == SHIFT_MARK) {
             expr_item *p = (expr_item *)stack_pop(stack); 
-            if(p) free(p);
-        }
-
-        stack_push_value(stack, &item, sizeof(item));
-        return true;
-    }
-    else if (top.symbol == ID) {
-        expr_item item = *(expr_item *)stack_pop(stack);
-
-        if (item.expr == NULL) {
-            // === PŘESNĚ TO CO TAM BYLO DOTEĎ ===
-            item.expr = malloc(sizeof(struct ast_expression));
-            if (!item.expr) {
-                return ERR_INTERNAL;
-            }
-            item.expr->type = AST_ID;
-            item.expr->operands.identifier.value = item.token->value->data;
-        }
-        // else: item.expr už existuje
-
-        item.symbol = EXPR;
-
-        top = *(expr_item *)stack->top->data;
-        if(top.symbol == SHIFT_MARK) {
-            expr_item *p = (expr_item *)stack_pop(stack);
             if(p) free(p);
         }
 
@@ -238,6 +238,10 @@ bool reduce_rule(stack *stack) {
     return false;
 }
 
+/*
+ * @brief Push SHIFT_MARK onto the stack
+ * @param s stack pointer
+ */
 void push_shift(stack *s) {
     stack tmpStack;
     stack_init(&tmpStack);
@@ -258,6 +262,11 @@ void push_shift(stack *s) {
     }
 }
 
+/*
+ * @brief Get the top terminal symbol from the stack
+ * @param stack stack pointer
+ * @return prec_table_enum top terminal symbol
+ */
 prec_table_enum get_top_terminal(stack *stack) {
     stack_item *current = stack->top;
     while(current != NULL) {

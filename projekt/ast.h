@@ -1,9 +1,8 @@
 /**
  * @authors Šimon Dufek (xdufeks00)
-
  * @file ast.h
  * 
- * Implementation of the ast nodes and ast logic
+ * @brief Implementation of the ast nodes and ast logic
  * BUT FIT
  */
 
@@ -12,6 +11,7 @@
 
 #include "string.h"
 
+/// @brief Definition of all AST node types
 enum ast_node_type {
     AST_BLOCK,
     AST_CONDITION,
@@ -29,6 +29,7 @@ enum ast_node_type {
     AST_IFJ_FUNCTION
 };
 
+/// @brief Definition of all AST expression types
 typedef enum {
     AST_ID,
     AST_NONE,
@@ -56,6 +57,7 @@ typedef enum {
     AST_CONCAT
 } ast_expression_type;
 
+/// @brief Definition of all AST value types
 typedef enum {
     AST_VALUE_INT,
     AST_VALUE_FLOAT,
@@ -64,6 +66,7 @@ typedef enum {
     AST_VALUE_IDENTIFIER
 } ast_value_type;
 
+/// @brief Definition of AST parameter
 typedef struct ast_parameter {
     ast_value_type value_type;
     union {
@@ -75,6 +78,7 @@ typedef struct ast_parameter {
     struct ast_parameter *next;
 } *ast_parameter;
 
+/// @brief Definition of AST expression
 typedef struct ast_expression {
     ast_expression_type type;
     union {
@@ -102,6 +106,7 @@ typedef struct ast_expression {
     } operands;
 } *ast_expression;
 
+/// @brief Definition of AST node
 typedef struct ast_node {
     enum ast_node_type type;
     struct ast_node *next;
@@ -157,42 +162,45 @@ typedef struct ast_node {
     } data;
 } *ast_node;
 
+/// @brief Definition of AST function
 typedef struct ast_function {
     char *name;
     struct ast_parameter *parameters;
     struct ast_block *code;
 } *ast_function;
 
+/// @brief Definition of AST ifj.* function call
 typedef struct ast_ifj_function {
     char *name;
     struct ast_parameter *parameters;
 } *ast_ifj_function;
 
-
+/// @brief Definition of AST function call
 typedef struct ast_fun_call {
     char *name;
     struct ast_parameter *parameters;
 } *ast_fun_call;
 
+/// @brief Definition of AST import
 typedef struct ast_import {
     char *path;
     char *alias;
 } *ast_import;
 
-/// @brief AST 
+/// @brief Definition of the AST
 typedef struct ast {
     struct ast_import *import;
     struct ast_class *class_list;
 } *ast;
 
-/// @brief List of classes
+/// @brief list of classes
 typedef struct ast_class {
     char *name;
     struct ast_block *current;
     struct ast_class *next;
 } *ast_class;
 
-/// @brief Block of code
+/// @brief block
 typedef struct ast_block {
     struct ast_node *first;
     struct ast_node *current;

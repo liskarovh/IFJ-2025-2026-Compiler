@@ -3,7 +3,7 @@
  *
  * @file parser.h
  *
- * Syntax analyzer implementation
+ * @brief Syntax analyzer implementation
  * BUT FIT
  */
 
@@ -13,6 +13,7 @@
 #include "token.h"
 #include "ast.h"
 
+/// @brief Enumeration of grammar rules for the parser
 enum grammar_rule {
     GRAMMAR_ID,
     GRAMMAR_PROGRAM,

@@ -15,7 +15,6 @@
 #define SCOPE_STACK_H
 
 #include <stdbool.h>
-#include <stddef.h>
 #include "stack.h"
 #include "symtable.h"
 

@@ -3,7 +3,7 @@
  *
  * @file parser.c
  *
- * Syntax analyzer implementation
+ * @brief Syntax analyzer implementation
  * BUT FIT
  */
 
@@ -498,13 +498,11 @@ int parser(DLListTokens *tokenList, ast out_ast, enum grammar_rule expected_rule
 
         if (tokenList->active->token->type == T_ASSIGN) {
             ast_add_new_node(&current_class, AST_ASSIGNMENT); 
-        
-            // 4. Nastavit název u přiřazení pomocí uložené proměnné 'var_name'
-            current_class->current->current->data.assignment.name = var_name; // Použijeme var_name
+
+            current_class->current->current->data.assignment.name = var_name;
             
             DLLTokens_Next(tokenList);
-            
-            // Zbytek logiky pro výraz
+
             ast_expression current_expression; 
             int err = parse_expr(tokenList, &current_expression);
             if (err != SUCCESS) {

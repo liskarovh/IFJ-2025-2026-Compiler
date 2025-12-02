@@ -3,7 +3,7 @@
 
  * @file ast.c
  * 
- * Implementation of the ast nodes and ast logic
+ * @brief Implementation of the ast nodes and ast logic
  * BUT FIT
  */
 
@@ -558,6 +558,9 @@ void ast_print_node(ast_node node, char *offset) {
     }
 }
 
+/// @brief Gets the operator symbol as a string
+/// @param type type of the AST expression
+/// @return operator symbol as a string
 char *get_operator_symbol(ast_expression_type type) {
     switch (type)
     {

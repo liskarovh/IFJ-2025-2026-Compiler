@@ -1,18 +1,9 @@
 /**
  * @file builtins.h
- * @brief Registration and metadata for IFJ25 built-in functions.
+ * @brief Registration to the symtable for IFJ25 built-in functions.
  *
- * All built-in functions are stored fully-qualified as "Ifj.read_str",
- * "Ifj.write", etc. During Pass 1 their signatures are inserted into the
- * global function table with keys of the form "<qname>#<arity>"
- * (for example "Ifj.write#1").
- *
- * Only the arity is persisted in the symtable entry itself; lightweight
- * parameter-kind information is available through builtins_get_param_spec()
- * for semantic checks.
- *
- * @authors
- *   Hana Liškařová (xliskah00)
+ * @authors Hana Liškařová (xliskah00)
+ * @note  Project: IFJ / BUT FIT
  */
 
 #ifndef BUILTINS_H
@@ -22,12 +13,11 @@
 #include "symtable.h"
 
 /**
- * @brief Compile-time classification of a single built-in parameter.
+ * @brief Kinds of built-in function parameters.
  *
- * BUILTIN_PARAM_ANY    – the compiler does not restrict the type
- *                        (e.g. Ifj.write, Ifj.str, Ifj.is_int),
- * BUILTIN_PARAM_STRING – the parameter must be a string (e.g. Ifj.length),
- * BUILTIN_PARAM_NUMBER – the parameter must be a number (e.g. Ifj.floor).
+ * - BUILTIN_PARAM_ANY:    any type is accepted,
+ * - BUILTIN_PARAM_STRING: only string type is accepted,
+ * - BUILTIN_PARAM_NUMBER: only number type is accepted.
  */
 typedef enum {
     BUILTIN_PARAM_ANY = 0,
@@ -36,7 +26,7 @@ typedef enum {
 } builtin_param_kind;
 
 /**
- * @brief Feature switches for optional extensions.
+ * @brief Feature switch for optional extensions.
  *
  * - ext_boolthen: enables Ifj.read_bool
  * - ext_statican: enables Ifj.is_int
@@ -47,14 +37,7 @@ typedef struct {
 } builtins_config;
 
 /**
- * @brief Install all enabled built-ins into the given global function table.
- *
- * For each built-in, a symbol is inserted under key "<qname>#<arity>".
- * Example: "Ifj.write#1".
- *
- * On success, the created entry has:
- *   - st_data.symbol_type = ST_FUN
- *   - st_data.param_count = arity
+ * @brief Install all enabled built-ins into global function table.
  *
  * @param gtab Global symbol table used for function signatures.
  * @param cfg  Extension flags controlling which built-ins are registered.
@@ -63,27 +46,20 @@ typedef struct {
 bool builtins_install(symtable *gtab, builtins_config cfg);
 
 /**
- * @brief Return the declared parameter kinds for a built-in function.
+ * @brief Retrieve parameter kind specification for a built-in function.
  *
- * This is a read-only view into the canonical built-in table.
- *
- * @param qname      Fully-qualified name (for example "Ifj.substring").
- * @param out_kinds  Optional output buffer; if non-NULL, the first
- *                   min(arity, max_kinds) parameter kinds are written here.
- * @param max_kinds  Size of @p out_kinds buffer.
- * @return           Arity of the built-in (number of parameters), or 0 if
- *                   @p qname is not a known built-in.
+ * @param qname      Fully-qualified name of the built-in function.
+ * @param out_kinds  Output array to receive parameter kinds.
+ * @param max_kinds  Maximum number of kinds to write to @p out_kinds.
+ * @return Number of parameter kinds written to @p out_kinds.
  */
 unsigned builtins_get_param_spec(const char *qname, builtin_param_kind *out_kinds, unsigned max_kinds);
 
 /**
- * @brief Quick check whether a function name is an IFJ built-in.
+ * @brief Check if a given name is a built-in function.
  *
- * A function is considered built-in if its fully-qualified name starts
- * with the "Ifj." prefix.
- *
- * @param name Fully-qualified candidate name.
- * @return true if the name starts with "Ifj.", otherwise false.
+ * @param name Fully-qualified name to check.
+ * @return true if @p name is a built-in function, false otherwise.
  */
 bool builtins_is_builtin_qname(const char *name);
 

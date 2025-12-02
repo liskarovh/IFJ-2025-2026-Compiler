@@ -1,9 +1,8 @@
 /**
  * @authors Martin Bíško (xbiskom00)
-
+ * @brief Implementation of the token structure and list of tokens
  * @file token.c
- * 
- * Implementation of the token structure and list of tokens
+ *
  * BUT FIT
  */
 
@@ -32,7 +31,7 @@ tokenPtr token_create(void) {
 /// @param t token to print
 void token_format_string(tokenPtr t) {
     printf("Token type: %d\n", t->type);
-    if(t->value) {
+    if (t->value) {
         printf("Token value: %s\n", t->value->data);
     } else {
         printf("Token value: (null)\n");
@@ -74,8 +73,7 @@ void DLLTokens_Init(DLListTokens *list) {
 /// @brief Disposes of the list of tokens
 /// @param  list list to dispose
 void DLLTokens_Dispose(DLListTokens *list) {
-    while (list->first != NULL)
-    {
+    while (list->first != NULL) {
         list->active = list->first;
         list->first = list->first->next;
         token_destroy(list->active->token);
@@ -91,9 +89,8 @@ void DLLTokens_Dispose(DLListTokens *list) {
 /// @param t token to be inserted
 void DLLTokens_InsertFirst(DLListTokens *list, tokenPtr t) {
     // allocate memory for the new element
-    DLLTokenElementPtr newElement = (DLLTokenElementPtr)malloc(sizeof(struct DLLTokenElement));
-    if (newElement == NULL)
-    {
+    DLLTokenElementPtr newElement = (DLLTokenElementPtr) malloc(sizeof(struct DLLTokenElement));
+    if (newElement == NULL) {
         error(ERR_INTERNAL, "Failed to allocate memory");
         return;
     }
@@ -104,12 +101,9 @@ void DLLTokens_InsertFirst(DLListTokens *list, tokenPtr t) {
     newElement->next = list->first;
 
     // if the list is not empty, update the current last element's next pointer
-    if (list->first != NULL)
-    {
+    if (list->first != NULL) {
         list->first->prev = newElement;
-    }
-    else
-    {
+    } else {
         list->last = newElement;
     }
 
@@ -122,26 +116,22 @@ void DLLTokens_InsertFirst(DLListTokens *list, tokenPtr t) {
 /// @param list list to insert into
 /// @param t token to be inserted
 void DLLTokens_InsertLast(DLListTokens *list, tokenPtr t) {
-     // allocate memory for the new element
-    DLLTokenElementPtr newElement = (DLLTokenElementPtr)malloc(sizeof(struct DLLTokenElement));
-    if (newElement == NULL)
-    {
+    // allocate memory for the new element
+    DLLTokenElementPtr newElement = (DLLTokenElementPtr) malloc(sizeof(struct DLLTokenElement));
+    if (newElement == NULL) {
         error(ERR_INTERNAL, "Failed to allocate memory");
         return;
     }
 
     // set the data for the new element
     newElement->token = t;
-    newElement->next = NULL;       // this will be the last element, so no next element
+    newElement->next = NULL; // this will be the last element, so no next element
     newElement->prev = list->last; // its previous element is the current last element
 
     // if the list is not empty, update the current last element's next pointer
-    if (list->last != NULL)
-    {
+    if (list->last != NULL) {
         list->last->next = newElement;
-    }
-    else
-    {
+    } else {
         // If the list was empty, the new element is also the first element
         list->first = newElement;
     }
@@ -162,7 +152,7 @@ void DLLTokens_First(DLListTokens *list) {
 /// @brief sets active token to the next token
 /// @param list pointer to the list
 void DLLTokens_Next(DLListTokens *list) {
-    if(list->active != NULL) {
+    if (list->active != NULL) {
         list->active = list->active->next;
     }
 }
@@ -172,8 +162,7 @@ void DLLTokens_Next(DLListTokens *list) {
 void DLLTokens_Print(DLListTokens *list) {
     DLLTokenElementPtr tmp = list->first;
 
-    while (tmp != NULL)
-    {
+    while (tmp != NULL) {
         token_format_string(tmp->token);
         tmp = tmp->next;
     }

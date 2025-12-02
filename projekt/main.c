@@ -4,7 +4,7 @@
  *
  * @file main.c
  *
- * Error handling and output to stderr
+ * @brief Compiler main pipeline
  * BUT FIT
  */
 
@@ -18,10 +18,17 @@
 #include "codegen.h"
 #include "semantic.h"
 
+/* Main compiler pipeline:
+ * 1) Lexical analysis
+ * 2) Syntactic analysis (AST construction)
+ * 3) Semantic analysis
+ * 4) Code generation
+ * 5) Cleanup
+ */
 int main(void) {
     int result;
 
-    // ===== 1) Lexical analysis (scanner) =====
+    // ===== 1) Lexical analysis =====
     DLListTokens token_list;
     DLLTokens_Init(&token_list);
 
@@ -33,14 +40,14 @@ int main(void) {
 
     DLLTokens_First(&token_list);
 
-    // ===== 2) Build AST (parser) =====
+    // ===== 2) Build AST=====
     ast ast_tree = NULL;
     ast_init(&ast_tree);
 
     result = parser(&token_list, ast_tree, GRAMMAR_PROGRAM);
     if (result != SUCCESS) {
         DLLTokens_Dispose(&token_list);
-        // ast_dispose(ast_tree);  // použijeme, až bude AST dispose stabilní
+        // ast_dispose(ast_tree);
         return result;
     }
 

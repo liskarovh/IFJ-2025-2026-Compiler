@@ -1,3 +1,14 @@
+/**
+ * @file symtable.h
+ * @brief Symbol table definition.
+ *
+ * This header file defines the structures and functions for managing a symbol table,
+ * which is used to store information about identifiers.
+ *
+ * @authors Matej Kurta (xkurtam00)
+ * @note Project: IFJ / BUT FIT
+ */
+
 #ifndef SYMTABLE_H
 #define SYMTABLE_H
 
@@ -8,10 +19,11 @@
 #include "string.h"
 #include "ast.h"
 
-
-
 #define SYMTABLE_SIZE 16381
 
+/**
+ * @brief Data type enumeration.
+ */
 typedef enum {
     ST_UNKNOWN = -1,
     ST_NULL,
@@ -21,8 +33,11 @@ typedef enum {
     ST_BOOL,
     ST_VOID,
     ST_U8
-}data_type;
+} data_type;
 
+/**
+ * @brief Symbol type enumeration.
+ */
 typedef enum {
     ST_VAR,
     ST_CONST,
@@ -31,9 +46,12 @@ typedef enum {
     ST_GLOB,
     ST_GETTER,
     ST_SETTER
-}symbol_type;
+} symbol_type;
 
-typedef struct st_data{
+/**
+ * @brief Symbol data structure.
+ */
+typedef struct st_data {
     data_type data_type;
     symbol_type symbol_type;
     bool defined;
@@ -44,24 +62,27 @@ typedef struct st_data{
     int param_count;
     string *params;
     ast_node decl_node;
-    
+
     // main, block etc.
     string scope_name;
+} st_data;
 
-}st_data;
-
-typedef struct st_symbol{
+/**
+ * @brief Symbol table entry structure - symbol.
+ */
+typedef struct st_symbol {
     char *key;
-     st_data *data;
+    st_data *data;
     bool occupied;
     bool deleted;
-}st_symbol;
+} st_symbol;
 
+/**
+ * @brief Symbol table structure.
+ */
 typedef struct {
     unsigned size;
     st_symbol *table;
-
-
 } symtable;
 
 
@@ -115,15 +136,30 @@ void st_free(symtable *table);
  * @param table Symbol table to dump.
  * @param out   Output stream (stdout/stderr/file).
  */
-void      st_dump(symtable *table, FILE *out);
+void st_dump(symtable *table, FILE *out);
 
+/**
+ * @brief Callback function type for iterating over symbol table entries.
+ * @param key The key of the current symbol.
+ * @param data Pointer to the symbol's data.
+ * @param user_data User-defined data passed to the callback.
+ */
 typedef void (*st_iter_cb)(const char *key, st_data *data, void *user_data);
 
 /**
  * @brief Iterate over all entries in the symbol table.
  *        For each (key, data) calls cb(key, data, user_data).
+ *        @param   t The symbol table to iterate over.
+ *        @param   cb The callback function to call for each occupied symbol.
+ *        @param   user_data User-defined data to pass to the callback function.
  */
 void st_foreach(symtable *t, st_iter_cb cb, void *user_data);
+
+/**
+ * @brief Duplicates a string by allocating new memory.
+ * @param s Input string to duplicate.
+ * @return Pointer to the newly allocated duplicate string, or NULL on failure.
+ */
 char *my_strdup(const char *s);
 
 #endif // SYMTABLE_H

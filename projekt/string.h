@@ -3,7 +3,7 @@
 
  * @file string.h
  * 
- * Custom dynamic strings for easy string manipulation
+ * @brief Custom dynamic strings for easy string manipulation
  * BUT FIT
  */
 
@@ -15,9 +15,8 @@
 
 #define DEFAULT_SIZE 16
 
-/// @brief Structure for the dinamic string
-typedef struct string
-{
+/// @brief Structure for the dynamic string
+typedef struct string {
     size_t length;
     size_t capacity;
     char *data;
@@ -38,7 +37,7 @@ bool string_append_char(string str, char c);
 /// @param str string to append to
 /// @param literal pointer ro array of chars
 /// @return true if success, false if memory allocation error
-bool string_append_literal(string str, char * literal);
+bool string_append_literal(string str, char *literal);
 
 
 /// @brief concatenates two strings to the first one

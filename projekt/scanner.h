@@ -3,7 +3,7 @@
  *
  * @file scanner.h
  *
- * Lexical analyzer implemented as a streaming FSM.
+ * @brief Lexical analyzer implemented as a streaming FSM.
  * Line/column are 1-based and refer to the position of the last read character.
  * BUT FIT
  */
@@ -55,7 +55,6 @@ int scanner_append_next_token(DLListTokens *list);
  * Returns SUCCESS, ERR_LEX, or ERR_INTERNAL.
  */
 int scanner(FILE *source, DLListTokens *out_list);
-
 
 
 #endif // IFJ_SCANNER_H

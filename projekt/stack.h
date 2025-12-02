@@ -3,7 +3,7 @@
  *
  * @file stack.h
  *
- * Stack structure and its functions
+ * @brief Stack structure and its functions definition.
  * BUT FIT
  */
 
@@ -41,6 +41,7 @@ void stack_push(stack *stack, void *data);
 
 
 void stack_push_value(stack *stack, void *data, size_t size);
+
 /**
  * @brief Pops the top element and returns its pointer.
  * @return Pointer to popped data, or NULL if stack empty.

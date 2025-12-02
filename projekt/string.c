@@ -3,7 +3,7 @@
 
  * @file string.c
  * 
- * Custom dynamic strings for easy string manipulation
+ * @brief Custom dynamic strings for easy string manipulation
  * BUT FIT
  */
 
@@ -18,18 +18,15 @@
 /// @brief creates a new string
 /// @param init_capacity capacity of chars of the string 0 = DEFAULT_SIZE
 /// @return pointer to the new string
-string string_create(size_t init_capacity)
-{
+string string_create(size_t init_capacity) {
     if (init_capacity == 0)
         init_capacity = DEFAULT_SIZE;
     string str = malloc(sizeof(struct string));
-    if (str == NULL)
-    {
+    if (str == NULL) {
         return NULL;
     }
     str->data = malloc(init_capacity + 1);
-    if (str->data == NULL)
-    {
+    if (str->data == NULL) {
         free(str);
         return NULL;
     }
@@ -41,8 +38,7 @@ string string_create(size_t init_capacity)
 /// @brief internal function to double the capacity of the string
 /// @param str string to double
 /// @return true if success, false if memory allocation error
-bool __double_string(string str)
-{
+bool __double_string(string str) {
     char *new_string = realloc(str->data, str->capacity * 2 + 1);
     if (new_string == NULL)
         return false;
@@ -53,16 +49,14 @@ bool __double_string(string str)
 
 /// @brief clears the string (str = "")
 /// @param str  string to clear
-void string_clear(string str)
-{
+void string_clear(string str) {
     str->data[0] = '\0';
     str->length = 0;
 }
 
 /// @brief frees the memory allocated for the string
 /// @param str string to be freed
-void string_destroy(string str)
-{
+void string_destroy(string str) {
     if (!str) return;
     if (str->data) {
         free(str->data);
@@ -75,12 +69,9 @@ void string_destroy(string str)
 /// @param str string to append to
 /// @param c char to append
 /// @return true if success, false if memory allocation error
-bool string_append_char(string str, char c)
-{
-    if (str->capacity < str->length + 1)
-    {
-        if (!__double_string(str))
-        {
+bool string_append_char(string str, char c) {
+    if (str->capacity < str->length + 1) {
+        if (!__double_string(str)) {
             error(ERR_INTERNAL, "Memory alocation error");
             return false;
         }
@@ -97,8 +88,8 @@ bool string_append_char(string str, char c)
 /// @param str string to append to
 /// @param literal pointer to string
 /// @return true if success, false if memory allocation error
-bool string_append_literal(string str, char * literal) {
-    if(literal == NULL)
+bool string_append_literal(string str, char *literal) {
+    if (literal == NULL)
         return true;
     while (str->capacity < str->length + strlen(literal)) {
         if (!__double_string(str)) {
@@ -116,13 +107,11 @@ bool string_append_literal(string str, char * literal) {
 /// @param str1 
 /// @param str2 
 /// @return 
-bool string_concat(string str1, string str2){
+bool string_concat(string str1, string str2) {
     // loop over the second string and append it to the first one
-    for (size_t i = 0; i < str2->length; i++)
-    {
-        if(str2->data[i] == '\0') break;
-        if (!string_append_char(str1, str2->data[i]))
-        {
+    for (size_t i = 0; i < str2->length; i++) {
+        if (str2->data[i] == '\0') break;
+        if (!string_append_char(str1, str2->data[i])) {
             return false;
         }
     }

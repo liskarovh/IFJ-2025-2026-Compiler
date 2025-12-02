@@ -12,10 +12,17 @@
 
 #include "ast.h"
 #include "string.h"
+#include "stack.h"
+
+typedef struct loop_labels {
+    char *start_label;
+    char *end_label;
+} loop_labels_t;
 
 typedef struct generator{
     string output;
     unsigned counter;
+    stack loop_stack;
 }* generator;
 
 enum arity{

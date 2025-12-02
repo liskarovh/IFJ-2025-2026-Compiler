@@ -5,8 +5,8 @@
  * @file scope_stack.c
  * @brief Implementation of a scope stack for semantic analysis (IFJ25).
  *
- * Each scope frame stores a @c symtable* of local identifiers. Enables:
- *  - push/pop of frames on block/function entry/exit,
+ * Each scope stores symtable* of local identifiers. Enables:
+ *  - push/pop frames on block/function entry/exit,
  *  - declaring locals with no redeclare in the same block,
  *  - lookups with correct shadowing
  *
@@ -107,6 +107,12 @@ bool scopes_declare_local(scope_stack *s, const char *name, bool defined) {
     return st_get(top, (char *) name) != NULL;
 }
 
+/**
+ * @brief Lookup an identifier in the current frame only.
+ * @param s Pointer to a @c scope_stack.
+ * @param name Identifier name (string).
+ * @return Pointer to symbol data, or @c NULL if not found.
+ */
 st_data *scopes_lookup_in_current(scope_stack *s, const char *name) {
     assert(s && name);
     symtable *top = scopes_top(s);
@@ -115,6 +121,12 @@ st_data *scopes_lookup_in_current(scope_stack *s, const char *name) {
     return st_get(top, (char *) name);
 }
 
+/**
+ * @brief Lookup an identifier in all frames (with shadowing).
+ * @param s Pointer to a @c scope_stack.
+ * @param name Identifier name (string).
+ * @return Pointer to symbol data, or @c NULL if not found.
+ */
 st_data *scopes_lookup(scope_stack *s, const char *name) {
     assert(s && name);
     for (stack_item *it = s->frames.top; it; it = it->next) {
@@ -128,13 +140,21 @@ st_data *scopes_lookup(scope_stack *s, const char *name) {
     return NULL;
 }
 
+/**
+ * @brief Dispose the entire scope stack, freeing all frames and their symtables.
+ * @param s Pointer to a @c scope_stack.
+ */
 void scopes_dispose(scope_stack *s) {
     assert(s);
     while (scopes_pop(s)) {
     }
 }
 
-
+/**
+ * @brief Dump the entire scope stack to the given output stream.
+ * @param scopes Pointer to a @c scope_stack.
+ * @param out Output stream (e.g., @c stdout).
+ */
 void scopes_dump(const scope_stack *scopes, FILE *out) {
     if (!scopes || !out)
         return;

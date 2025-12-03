@@ -132,7 +132,7 @@ char *ast_value_to_string(ast_expression expr_node, ast_parameter param_node) {
     char *char_val;
     if(expr_node) { // Expressions
         if(expr_node->type == AST_IDENTIFIER) {
-            char_val = expr_node->operands.identifier.value;
+            char_val = expr_node->operands.identifier.cg_name;
             type = AST_VALUE_IDENTIFIER;
         } else {
             type = expr_node->operands.identity.value_type;
@@ -155,6 +155,7 @@ char *ast_value_to_string(ast_expression expr_node, ast_parameter param_node) {
         case AST_VALUE_INT: int_val = param_node->value.int_value; break;
         case AST_VALUE_FLOAT: float_val = param_node->value.double_value; break;
         case AST_VALUE_NULL: break;
+        case AST_VALUE_IDENTIFIER: char_val = param_node->cg_name; break;
         default: char_val = param_node->value.string_value; break;
         }
     }
@@ -1011,13 +1012,13 @@ void generate_function_return(generator gen, ast_node node){
 // Assignment generation
 void generate_assignment(generator gen, ast_node node){
     if(node->data.assignment.value != NULL){
-        generate_expression(gen, node->data.assignment.name, node->data.assignment.value);
+        generate_expression(gen, node->data.assignment.cg_name, node->data.assignment.value);
     }
 }
 
 // Declaration generation
 void generate_declaration(generator gen, ast_node node){
-    define_variable(gen, node->data.declaration.name);
+    define_variable(gen, node->data.declaration.cg_name);
 }
 
 // Condition generation
@@ -1093,7 +1094,7 @@ void generate_while(generator gen, ast_node node){
     ast_node current = body->first;
     while (current) { //Declare before while for double declaration handling
         if (current->type == AST_VAR_DECLARATION) {
-            define_variable(gen, current->data.declaration.name);
+            define_variable(gen, current->data.declaration.cg_name);
         }
         current = current->next;
     }

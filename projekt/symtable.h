@@ -57,7 +57,7 @@ typedef struct st_data {
     bool defined;
     bool global;
     string ID;
-
+    char *cg_name;
     //functions
     int param_count;
     string *params;

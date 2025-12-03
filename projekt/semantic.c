@@ -1994,8 +1994,8 @@ static int sem2_visit_expr(semantic *cxt, ast_expression e, data_type *out_type)
             st_data *sym = scopes_lookup(&cxt->scopes, name);
 
             // propagate codegen name for local variable declaration
-            if (sym && sym->decl_node && sym->decl_node->type == AST_VAR_DECLARATION) {
-                e->operands.identifier.cg_name = sym->decl_node->data.declaration.cg_name;
+            if (sym && sym->cg_name) {
+                e->operands.identifier.cg_name = sym->cg_name;
             }
 
             // infer type from local symbol or learned global type
@@ -2359,6 +2359,7 @@ static int sem2_visit_statement_node(semantic *table, ast_node node) {
             if (!node->data.declaration.cg_name) {
                 return error(ERR_INTERNAL, "memory allocation failed for cg_name");
             }
+            sym->cg_name = node->data.declaration.cg_name;
             return SUCCESS;
         }
 
@@ -2452,18 +2453,31 @@ static int sem2_visit_statement_node(semantic *table, ast_node node) {
                 if (p->value_type != AST_VALUE_IDENTIFIER) {
                     continue;
                 }
+
                 const char *pname = p->value.string_value;
                 if (!pname) {
                     continue;
                 }
+
                 st_data *sym = scopes_lookup(&table->scopes, pname);
-                if (!sym || !sym->decl_node) {
+                if (!sym) {
                     continue;
                 }
+
                 char final[128];
                 sem_build_cg_name(final, sizeof final, pname, scope_str);
+
+                // store on AST parameter node
+                if (p->cg_name) {
+                    free(p->cg_name);
+                }
                 p->cg_name = my_strdup(final);
-                sym->decl_node->data.declaration.cg_name = p->cg_name;
+                if (!p->cg_name) {
+                    return error(ERR_INTERNAL, "memory allocation failed for parameter cg_name");
+                }
+
+                // store canonical cg_name on symbol as well
+                sym->cg_name = p->cg_name;
             }
 
             // visit function body statements
@@ -2600,19 +2614,31 @@ static int sem2_visit_statement_node(semantic *table, ast_node node) {
                 if (p->value_type != AST_VALUE_IDENTIFIER) {
                     continue;
                 }
+
                 const char *pname = p->value.string_value;
                 if (!pname) {
                     continue;
                 }
+
                 st_data *sym = scopes_lookup(&table->scopes, pname);
                 if (!sym) {
                     continue;
                 }
-                // build codegen name
+
                 char final[128];
                 sem_build_cg_name(final, sizeof final, pname, scope_str);
 
+                // store on AST parameter node
+                if (p->cg_name) {
+                    free(p->cg_name);
+                }
                 p->cg_name = my_strdup(final);
+                if (!p->cg_name) {
+                    return error(ERR_INTERNAL, "memory allocation failed for parameter cg_name");
+                }
+
+                // store canonical cg_name on symbol as well
+                sym->cg_name = p->cg_name;
             }
 
             // resolve identifier arguments

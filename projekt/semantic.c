@@ -2054,9 +2054,40 @@ static int sem2_visit_expr(semantic *cxt, ast_expression e, data_type *out_type)
             }
 
             bool treat_as_builtin = (call->name && builtins_is_builtin_qname(call->name));
-            // handle regular function call through shared helper
-            return sem2_visit_call_common(cxt, call->name, call->parameters, treat_as_builtin, out_type);
+
+            int rc = sem2_visit_call_common(cxt, call->name, call->parameters, treat_as_builtin, out_type);
+            if (rc != SUCCESS) {
+                return rc;
+            }
+
+            // change cg_name of identifier parameters to their resolved cg_name
+            for (ast_parameter p = call->parameters; p; p = p->next) {
+                if (p->value_type != AST_VALUE_IDENTIFIER) {
+                    continue;
+                }
+
+                const char *pname = p->value.string_value;
+                if (!pname) {
+                    continue;
+                }
+
+                st_data *sym = scopes_lookup(&cxt->scopes, pname);
+                if (!sym || !sym->cg_name) {
+                    continue;
+                }
+
+                if (p->cg_name) {
+                    free(p->cg_name);
+                }
+                p->cg_name = my_strdup(sym->cg_name);
+                if (!p->cg_name) {
+                    return error(ERR_INTERNAL, "memory allocation failed for parameter cg_name");
+                }
+            }
+
+            return SUCCESS;
         }
+
 
         case AST_IFJ_FUNCTION_EXPR: {
             ast_ifj_function call = e->operands.ifj_function;
@@ -2066,8 +2097,38 @@ static int sem2_visit_expr(semantic *cxt, ast_expression e, data_type *out_type)
 
             char qname[128];
             const char *name = call->name ? sem_build_ifj_qname(call->name, qname, sizeof qname) : "(null)";
-            // handle ifj.* call expression through shared helper (always builtin)
-            return sem2_visit_call_common(cxt, name, call->parameters, true, out_type);
+
+            int rc = sem2_visit_call_common(cxt, name, call->parameters, true, out_type);
+            if (rc != SUCCESS) {
+                return rc;
+            }
+
+            //change cg_name for identifier parameters
+            for (ast_parameter p = call->parameters; p; p = p->next) {
+                if (p->value_type != AST_VALUE_IDENTIFIER) {
+                    continue;
+                }
+
+                const char *pname = p->value.string_value;
+                if (!pname) {
+                    continue;
+                }
+
+                st_data *sym = scopes_lookup(&cxt->scopes, pname);
+                if (!sym || !sym->cg_name) {
+                    continue;
+                }
+
+                if (p->cg_name) {
+                    free(p->cg_name);
+                }
+                p->cg_name = my_strdup(sym->cg_name);
+                if (!p->cg_name) {
+                    return error(ERR_INTERNAL, "memory allocation failed for parameter cg_name");
+                }
+            }
+
+            return SUCCESS;
         }
 
         case AST_NOT:
@@ -2111,7 +2172,7 @@ static int sem2_visit_expr(semantic *cxt, ast_expression e, data_type *out_type)
                 return rc;
             }
 
-            // bail out early if any side is unknownish (keep expression flexible)
+            // bail out early if any side is unknownish
             if (sem_is_unknownish_type(lt) || sem_is_unknownish_type(rt)) {
                 if (out_type) {
                     if (e->type == AST_EQUALS || e->type == AST_NOT_EQUAL ||
@@ -2558,22 +2619,42 @@ static int sem2_visit_statement_node(semantic *table, ast_node node) {
                 return SUCCESS;
             }
 
-            // check call header resolve identifier arguments
             int ar = count_parameters(call->parameters);
             int rc = sem2_check_function_call(table, call->name, ar);
             if (rc != SUCCESS) {
                 return rc;
             }
 
-            // assign cg_name for identifier arguments based on scope id
+            //change cg_name for identifier parameters
             for (ast_parameter p = call->parameters; p; p = p->next) {
-                if (p->value_type == AST_VALUE_IDENTIFIER) {
-                    rc = sem2_resolve_identifier(table, p->value.string_value);
-                    if (rc != SUCCESS) {
-                        return rc;
-                    }
+                if (p->value_type != AST_VALUE_IDENTIFIER) {
+                    continue;
+                }
+
+                const char *pname = p->value.string_value;
+                if (!pname) {
+                    continue;
+                }
+
+                rc = sem2_resolve_identifier(table, pname);
+                if (rc != SUCCESS) {
+                    return rc;
+                }
+
+                st_data *sym = scopes_lookup(&table->scopes, pname);
+                if (!sym || !sym->cg_name) {
+                    continue;
+                }
+
+                if (p->cg_name) {
+                    free(p->cg_name);
+                }
+                p->cg_name = my_strdup(sym->cg_name);
+                if (!p->cg_name) {
+                    return error(ERR_INTERNAL, "memory allocation failed for parameter cg_name");
                 }
             }
+
             return SUCCESS;
         }
 
@@ -2607,8 +2688,6 @@ static int sem2_visit_statement_node(semantic *table, ast_node node) {
                 return rc;
             }
 
-            // assign cg_name for identifier arguments based on scope id
-            const char *scope_str = sem_scope_ids_current(&table->ids);
 
             for (ast_parameter p = call->parameters; p; p = p->next) {
                 if (p->value_type != AST_VALUE_IDENTIFIER) {
@@ -2620,36 +2699,28 @@ static int sem2_visit_statement_node(semantic *table, ast_node node) {
                     continue;
                 }
 
+                //exists
+                rc = sem2_resolve_identifier(table, pname);
+                if (rc != SUCCESS) {
+                    return rc;
+                }
+
+                //search for symbol
                 st_data *sym = scopes_lookup(&table->scopes, pname);
-                if (!sym) {
+                if (!sym || !sym->cg_name) {
                     continue;
                 }
 
-                char final[128];
-                sem_build_cg_name(final, sizeof final, pname, scope_str);
-
-                // store on AST parameter node
+                // assign cg_name from symbol to parameter
                 if (p->cg_name) {
                     free(p->cg_name);
                 }
-                p->cg_name = my_strdup(final);
+                p->cg_name = my_strdup(sym->cg_name);
                 if (!p->cg_name) {
                     return error(ERR_INTERNAL, "memory allocation failed for parameter cg_name");
                 }
-
-                // store canonical cg_name on symbol as well
-                sym->cg_name = p->cg_name;
             }
 
-            // resolve identifier arguments
-            for (ast_parameter p = call->parameters; p; p = p->next) {
-                if (p->value_type == AST_VALUE_IDENTIFIER) {
-                    rc = sem2_resolve_identifier(table, p->value.string_value);
-                    if (rc != SUCCESS) {
-                        return rc;
-                    }
-                }
-            }
             return SUCCESS;
         }
     }

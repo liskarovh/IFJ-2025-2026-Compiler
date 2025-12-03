@@ -5,10 +5,9 @@
  *  - Hana Liškařová (xliskah00)
  *  - Maťej Kurta (xkurtam00)
  *
- * The semantic module runs all static checks required on the AST and prepares metadata for the code generator.
  *  - seeds Ifj.* built-ins into global function table,
- *  - collects user function/getter/setter signatures,
- *  - checks identifier definitions, calls, loops and literal-only expressions,
+ *  - collects function/getter/setter signatures,
+ *  - does needed checks,
  *  - tracks globals  "__".
  */
 

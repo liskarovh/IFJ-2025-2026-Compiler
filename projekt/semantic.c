@@ -3,19 +3,15 @@
  * @brief Two-pass semantic analysis for the IFJ25 compiler.
  *
  * @details
- *  Implements the semantic analysis in two passes over the AST:
  *   - Pass 1:
- *       - installs IFJ built-in functions into the global function table,
- *       - collects function / getter / setter headers per class and records their signatures,
- *       - verifies the presence and arity of main() with zero parameters,
- *       - traverses all class bodies with a scope stack, declares locals,
- *         checks redeclarations, loop constructs and literal-only expressions,
+ *       -  built-in functions into the global function table,
+ *       - collects function / getter / setter headers,
+ *       - verifies main() with zero parameters,
+ *       - declares locals, checks redeclarations etc
  *   - Pass 2:
- *       - re-traverses all class bodies,
- *       - resolves identifiers (locals, accessors, globals "__*"),
- *       - checks function calls (user functions and Ifj.* built-ins) including arity,
- *       - performs type check for expressions and learns types
- *         of locals, parameters and globals from assignments,
+ *       - resolves identifiers,
+ *       - checks function calls,
+ *       - type check for expressions
  *
  * @authors
  *  - Hana Liškařová (xliskah00)

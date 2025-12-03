@@ -2453,20 +2453,29 @@ static int sem2_visit_statement_node(semantic *table, ast_node node) {
             } else {
                 st_data *sym = scopes_lookup(&table->scopes, lhs);
 
-                // propagate cg_name from declaration into assignment node
-                if (sym && sym->decl_node && sym->decl_node->type == AST_VAR_DECLARATION) {
-                    const char *decl_cg = sym->decl_node->data.declaration.cg_name;
-                    if (decl_cg) {
+                // propagate cg_name from symbol into assignment node
+                if (sym) {
+                    const char *lhs_cg = NULL;
+
+                    if (sym->decl_node && sym->decl_node->type == AST_VAR_DECLARATION) {
+                        lhs_cg = sym->decl_node->data.declaration.cg_name;
+                    }
+                    // fallback
+                    if (!lhs_cg) {
+                        lhs_cg = sym->cg_name;
+                    }
+
+                    if (lhs_cg) {
                         if (node->data.assignment.cg_name) {
                             free(node->data.assignment.cg_name);
                         }
-
-                        node->data.assignment.cg_name = my_strdup(decl_cg);
+                        node->data.assignment.cg_name = my_strdup(lhs_cg);
                         if (!node->data.assignment.cg_name) {
                             return error(ERR_INTERNAL, "memory allocation failed for assignment cg_name");
                         }
                     }
                 }
+
                 // update type for local variable or parameter
                 if (sym && (sym->symbol_type == ST_VAR || sym->symbol_type == ST_PAR)) {
                     data_type old_t = sym->data_type;
